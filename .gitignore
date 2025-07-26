@@ -1,37 +1,71 @@
-# Node
+# Dependencies
 node_modules/
-frontend/node_modules/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
 
-# Build
-frontend/dist/
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Build outputs
+dist/
+build/
+*.egg-info/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
 
 # Logs
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
-# Python
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-venv/
-env/
-backend/instance/
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+
+# Firebase
+.firebase/
+firebase-debug.log
+firestore-debug.log
 
 # Database
 *.db
 *.sqlite3
-backend/instance/database.db
 
-# Entornos y variables
-.env
-.env.*
-backend/.env
+# Temporary files
+*.tmp
+*.temp
 
-# IDEs
-.vscode/
-.idea/
-.DS_Store
+# Backend specific
+backend/instance/
+backend/database.db
 
-# Otros
-package-lock.json
-frontend/package-lock.json 
+# Frontend specific
+frontend/.vite/
+frontend/dist/ 
