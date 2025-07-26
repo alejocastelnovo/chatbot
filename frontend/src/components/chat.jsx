@@ -14,6 +14,17 @@ function Chat({ userId, selectedChat, onNewChat }) {
     const [inputFocus, setInputFocus] = useState(false);
     const [typingBotMsg, setTypingBotMsg] = useState('');
     const typingTimeout = useRef(null);
+    const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+
+    // Hook para detectar cambios en el tamaño de la ventana
+    useEffect(() => {
+        const handleResize = () => {
+            setWindowWidth(window.innerWidth);
+        };
+
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
 
     // Función para obtener el rol del usuario
     const getUserRole = async () => {
@@ -180,71 +191,72 @@ function Chat({ userId, selectedChat, onNewChat }) {
                 zIndex: 1,
             }} />
             <div style={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', height: '100%' }}>
-                {/* Header del bot, centrado y alineado */}
-                <div style={{
-                    width: '100%',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    margin: '0 0 12px 0',
-                    padding: '18px 0 0 0',
-                    background: 'transparent',
-                    borderBottom: '1px solid #232526',
-                }}>
+                {/* Header del bot - solo visible cuando no hay mensajes */}
+                {mensajes.length === 0 && (
                     <div style={{
-                        maxWidth: 700,
                         width: '100%',
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        padding: '0 32px',
+                        margin: '0 0 12px 0',
+                        padding: '18px 0 0 0',
+                        background: 'transparent',
+                        borderBottom: '1px solid #232526',
                     }}>
-                        <h1 style={{
-                            fontSize: '1.3rem',
-                            marginBottom: 4,
-                            fontWeight: 700,
-                            color: '#fff',
-                            letterSpacing: 0.5,
-                            textAlign: 'center',
-                        }}>
-                            MentorBot IA - Asistente de Trading
-                        </h1>
-                        <p style={{
-                            fontSize: '1rem',
-                            marginBottom: 0,
-                            color: '#b6b6b6',
-                            letterSpacing: 0.1,
-                            textAlign: 'center',
-                            margin: '0 0 16px 0',
-                        }}>
-                            Tu asistente inteligente para análisis técnico y fundamental, gestión de riesgo y estrategias de inversión en acciones, ETFs y criptomonedas. Consultá cualquier duda de trading y finanzas.
-                        </p>
-                        {/* Mostrar rol del usuario */}
                         <div style={{
-                            background: userRole === 'premium' ? '#1ee87a' : '#ff6b6b',
-                            color: userRole === 'premium' ? '#232526' : '#fff',
-                            padding: '4px 12px',
-                            borderRadius: 12,
-                            fontSize: '0.8rem',
-                            fontWeight: 'bold',
-                            textTransform: 'uppercase'
+                            maxWidth: 700,
+                            width: '100%',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            padding: '0 32px',
                         }}>
-                            Plan: {userRole === 'premium' ? 'Premium' : 'Free'}
+                            <h1 style={{
+                                fontSize: '1.3rem',
+                                marginBottom: 4,
+                                fontWeight: 700,
+                                color: '#fff',
+                                letterSpacing: 0.5,
+                                textAlign: 'center',
+                            }}>
+                                MentorBot IA - Asistente de Trading
+                            </h1>
+                            <p style={{
+                                fontSize: '1rem',
+                                marginBottom: 0,
+                                color: '#b6b6b6',
+                                letterSpacing: 0.1,
+                                textAlign: 'center',
+                                margin: '0 0 16px 0',
+                            }}>
+                                Tu asistente inteligente para análisis técnico y fundamental, gestión de riesgo y estrategias de inversión en acciones, ETFs y criptomonedas. Consultá cualquier duda de trading y finanzas.
+                            </p>
+                            {/* Mostrar rol del usuario */}
+                            <div style={{
+                                background: userRole === 'premium' ? '#1ee87a' : '#ff6b6b',
+                                color: userRole === 'premium' ? '#232526' : '#fff',
+                                padding: '4px 12px',
+                                borderRadius: 12,
+                                fontSize: '0.8rem',
+                                fontWeight: 'bold',
+                                textTransform: 'uppercase'
+                            }}>
+                                Plan: {userRole === 'premium' ? 'Premium' : 'Free'}
+                            </div>
                         </div>
                     </div>
-                </div>
+                )}
                 <div style={{
                     flex: 1,
                     overflowY: 'auto',
-                    padding: '32px 0 24px 0',
+                    padding: mensajes.length === 0 ? '32px 0 24px 0' : '16px 0 24px 0',
                     background: 'transparent',
                     display: 'flex',
                     flexDirection: 'column',
                     gap: 12,
                     minHeight: 0, // para que flexbox no expanda
-                    maxHeight: 'calc(100vh - 250px)',
                 }}>
                     {mensajes.map((m, i) => (
                         <div
@@ -261,9 +273,9 @@ function Chat({ userId, selectedChat, onNewChat }) {
                                     color: '#fff',
                                     borderRadius: 16,
                                     padding: '14px 20px',
-                                    maxWidth: '70%',
+                                    maxWidth: windowWidth <= 1366 ? '85%' : '70%',
                                     wordBreak: 'break-word',
-                                    fontSize: 16,
+                                    fontSize: windowWidth <= 1366 ? 14 : 16,
                                     boxShadow: m.sender === 'user' ? '0 2px 8px #23252633' : '0 2px 8px #0002',
                                     marginRight: m.sender === 'user' ? 16 : 0,
                                     marginLeft: m.sender === 'bot' ? 16 : 0,
@@ -274,11 +286,113 @@ function Chat({ userId, selectedChat, onNewChat }) {
                                     <ReactMarkdown
                                         children={m.text}
                                         components={{
-                                            h1: ({node, ...props}) => <h1 style={{fontSize: 22, fontWeight: 700, margin: '16px 0 8px 0'}} {...props} />,
-                                            h2: ({node, ...props}) => <h2 style={{fontSize: 18, fontWeight: 700, margin: '12px 0 6px 0'}} {...props} />,
-                                            li: ({node, ...props}) => <li style={{marginLeft: 16, marginBottom: 4}} {...props} />,
-                                            strong: ({node, ...props}) => <strong style={{fontWeight: 700}} {...props} />,
-                                            // Podés agregar más estilos si querés
+                                            h1: ({node, ...props}) => <h1 style={{
+                                                fontSize: windowWidth <= 1366 ? 18 : 22, 
+                                                fontWeight: 700, 
+                                                margin: '16px 0 8px 0',
+                                                color: '#fff'
+                                            }} {...props} />,
+                                            h2: ({node, ...props}) => <h2 style={{
+                                                fontSize: windowWidth <= 1366 ? 16 : 18, 
+                                                fontWeight: 700, 
+                                                margin: '12px 0 6px 0',
+                                                color: '#fff'
+                                            }} {...props} />,
+                                            h3: ({node, ...props}) => <h3 style={{
+                                                fontSize: windowWidth <= 1366 ? 14 : 16, 
+                                                fontWeight: 600, 
+                                                margin: '10px 0 5px 0',
+                                                color: '#fff'
+                                            }} {...props} />,
+                                            p: ({node, ...props}) => <p style={{
+                                                margin: '8px 0',
+                                                lineHeight: 1.5,
+                                                color: '#fff'
+                                            }} {...props} />,
+                                            ul: ({node, ...props}) => <ul style={{
+                                                margin: '8px 0',
+                                                paddingLeft: 20,
+                                                color: '#fff'
+                                            }} {...props} />,
+                                            ol: ({node, ...props}) => <ol style={{
+                                                margin: '8px 0',
+                                                paddingLeft: 20,
+                                                color: '#fff'
+                                            }} {...props} />,
+                                            li: ({node, ...props}) => <li style={{
+                                                marginBottom: 4,
+                                                lineHeight: 1.4,
+                                                color: '#fff'
+                                            }} {...props} />,
+                                            strong: ({node, ...props}) => <strong style={{
+                                                fontWeight: 700,
+                                                color: '#1ee87a'
+                                            }} {...props} />,
+                                            em: ({node, ...props}) => <em style={{
+                                                fontStyle: 'italic',
+                                                color: '#b6b6b6'
+                                            }} {...props} />,
+                                            code: ({node, inline, ...props}) => inline ? (
+                                                <code style={{
+                                                    background: '#232526',
+                                                    padding: '2px 6px',
+                                                    borderRadius: 4,
+                                                    fontSize: '0.9em',
+                                                    fontFamily: 'monospace',
+                                                    color: '#1ee87a'
+                                                }} {...props} />
+                                            ) : (
+                                                <pre style={{
+                                                    background: '#232526',
+                                                    padding: 12,
+                                                    borderRadius: 8,
+                                                    overflow: 'auto',
+                                                    margin: '12px 0',
+                                                    border: '1px solid #343541'
+                                                }}>
+                                                    <code style={{
+                                                        fontFamily: 'monospace',
+                                                        fontSize: windowWidth <= 1366 ? 12 : 14,
+                                                        color: '#fff',
+                                                        lineHeight: 1.4
+                                                    }} {...props} />
+                                                </pre>
+                                            ),
+                                            blockquote: ({node, ...props}) => <blockquote style={{
+                                                borderLeft: '4px solid #1ee87a',
+                                                paddingLeft: 16,
+                                                margin: '12px 0',
+                                                fontStyle: 'italic',
+                                                color: '#b6b6b6',
+                                                background: '#2a2f3a',
+                                                padding: '8px 16px',
+                                                borderRadius: '0 8px 8px 0'
+                                            }} {...props} />,
+                                            table: ({node, ...props}) => <div style={{
+                                                overflow: 'auto',
+                                                margin: '12px 0'
+                                            }}>
+                                                <table style={{
+                                                    borderCollapse: 'collapse',
+                                                    width: '100%',
+                                                    background: '#232526',
+                                                    borderRadius: 8,
+                                                    overflow: 'hidden'
+                                                }} {...props} />
+                                            </div>,
+                                            th: ({node, ...props}) => <th style={{
+                                                background: '#343541',
+                                                padding: '8px 12px',
+                                                textAlign: 'left',
+                                                borderBottom: '1px solid #444654',
+                                                fontWeight: 600,
+                                                color: '#fff'
+                                            }} {...props} />,
+                                            td: ({node, ...props}) => <td style={{
+                                                padding: '8px 12px',
+                                                borderBottom: '1px solid #444654',
+                                                color: '#fff'
+                                            }} {...props} />,
                                         }}
                                     />
                                 ) : m.text}
@@ -293,9 +407,9 @@ function Chat({ userId, selectedChat, onNewChat }) {
                                     color: '#fff',
                                     borderRadius: 16,
                                     padding: '14px 20px',
-                                    maxWidth: '70%',
+                                    maxWidth: windowWidth <= 1366 ? '85%' : '70%',
                                     wordBreak: 'break-word',
-                                    fontSize: 16,
+                                    fontSize: windowWidth <= 1366 ? 14 : 16,
                                     boxShadow: '0 2px 8px #0002',
                                     marginLeft: 16,
                                     border: '1.5px solid #232526',
@@ -311,12 +425,14 @@ function Chat({ userId, selectedChat, onNewChat }) {
                 </div>
                 <form onSubmit={handleSend} style={{
                     display: 'flex',
-                    gap: 12,
+                    gap: windowWidth <= 1366 ? 8 : 12,
                     background: '#23272f',
                     borderTop: '1.5px solid #232526',
-                    padding: 20,
-                    borderRadius: '0 0 0px 0px',
+                    padding: windowWidth <= 1366 ? 16 : 20,
+                    borderRadius: '0 0 16px 16px',
                     boxShadow: '0 -2px 8px #0002',
+                    marginTop: 'auto',
+                    flexShrink: 0,
                 }}>
                     <input
                         type="text"
@@ -328,10 +444,10 @@ function Chat({ userId, selectedChat, onNewChat }) {
                         onBlur={() => setInputFocus(false)}
                         style={{
                             flex: 1,
-                            padding: 18,
+                            padding: windowWidth <= 1366 ? 14 : 18,
                             borderRadius: 12,
                             border: inputFocus ? '1.5px solid #1ee87a' : '1.5px solid #232526',
-                            fontSize: 16,
+                            fontSize: windowWidth <= 1366 ? 14 : 16,
                             background: userRole !== 'premium' ? '#444654' : '#23272f',
                             color: userRole !== 'premium' ? '#666' : '#fff',
                             outline: 'none',
@@ -344,13 +460,13 @@ function Chat({ userId, selectedChat, onNewChat }) {
                         type="submit"
                         disabled={userRole !== 'premium' || loading}
                         style={{
-                            padding: '0 32px',
+                            padding: windowWidth <= 1366 ? '0 24px' : '0 32px',
                             borderRadius: 12,
                             border: 'none',
                             background: userRole !== 'premium' ? '#666' : (loading ? '#5c5f70' : '#444654'),
                             color: '#fff',
                             fontWeight: 'bold',
-                            fontSize: 18,
+                            fontSize: windowWidth <= 1366 ? 16 : 18,
                             cursor: userRole !== 'premium' || loading ? 'not-allowed' : 'pointer',
                             boxShadow: '0 2px 8px #0002',
                             transition: 'background 0.2s, color 0.2s',

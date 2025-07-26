@@ -216,6 +216,114 @@ def get_user_role_endpoint():
     role = get_user_role(user_id)
     return jsonify({'role': role}), 200
 
+@app.route('/user/profile', methods=['GET'])
+@require_auth
+def get_user_profile():
+    """Obtener el perfil completo del usuario"""
+    try:
+        user_id = request.user['uid']
+        user_doc = db.collection('users').document(user_id).get()
+        
+        if not user_doc.exists:
+            return jsonify({'error': 'Usuario no encontrado'}), 404
+        
+        user_data = user_doc.to_dict()
+        return jsonify({
+            'nombre': user_data.get('nombre', ''),
+            'apellido': user_data.get('apellido', ''),
+            'pais': user_data.get('pais', ''),
+            'email': user_data.get('email', ''),
+            'rol': user_data.get('rol', 'free'),
+            'fechaCreacion': user_data.get('fechaCreacion', ''),
+            'fechaActualizacion': user_data.get('fechaActualizacion', '')
+        }), 200
+        
+    except Exception as e:
+        print(f"Error obteniendo perfil: {e}")
+        return jsonify({'error': 'Error obteniendo perfil'}), 500
+
+@app.route('/user/profile', methods=['PUT'])
+@require_auth
+def update_user_profile():
+    """Actualizar el perfil del usuario"""
+    try:
+        user_id = request.user['uid']
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'error': 'Datos requeridos'}), 400
+        
+        # Validar campos requeridos
+        required_fields = ['nombre', 'apellido', 'pais']
+        for field in required_fields:
+            if field not in data or not data[field].strip():
+                return jsonify({'error': f'El campo {field} es requerido'}), 400
+        
+        # Preparar datos para actualizar
+        update_data = {
+            'nombre': data['nombre'].strip(),
+            'apellido': data['apellido'].strip(),
+            'pais': data['pais'].strip(),
+            'fechaActualizacion': datetime.now()
+        }
+        
+        # Actualizar en Firestore
+        db.collection('users').document(user_id).update(update_data)
+        
+        return jsonify({
+            'message': 'Perfil actualizado correctamente',
+            'profile': update_data
+        }), 200
+        
+    except Exception as e:
+        print(f"Error actualizando perfil: {e}")
+        return jsonify({'error': 'Error actualizando perfil'}), 500
+
+@app.route('/user/change-password', methods=['POST'])
+@require_auth
+def change_password():
+    """Cambiar la contraseña del usuario"""
+    try:
+        user_id = request.user['uid']
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'error': 'Datos requeridos'}), 400
+        
+        current_password = data.get('currentPassword')
+        new_password = data.get('newPassword')
+        
+        if not current_password or not new_password:
+            return jsonify({'error': 'Contraseña actual y nueva contraseña son requeridas'}), 400
+        
+        if len(new_password) < 6:
+            return jsonify({'error': 'La nueva contraseña debe tener al menos 6 caracteres'}), 400
+        
+        try:
+            from firebase_admin import auth
+            # Cambiar contraseña en Firebase Auth
+            auth.update_user(
+                user_id,
+                password=new_password
+            )
+            
+            # Actualizar fecha de actualización en Firestore
+            db.collection('users').document(user_id).update({
+                'fechaActualizacion': datetime.now()
+            })
+            
+            return jsonify({
+                'message': 'Contraseña actualizada correctamente'
+            }), 200
+            
+        except Exception as e:
+            print(f"Error cambiando contraseña: {e}")
+            return jsonify({'error': 'Error al cambiar la contraseña. Verifica que la contraseña actual sea correcta.'}), 400
+        
+    except Exception as e:
+        print(f"Error en change_password: {e}")
+        return jsonify({'error': 'Error interno del servidor'}), 500
+
 @app.route('/test/create-user', methods=['POST'])
 def create_test_user():
     """Endpoint para crear un usuario de prueba"""

@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { auth } from '../firebase';
-import { FiSearch, FiEdit3, FiBook, FiUser } from 'react-icons/fi';
+import { FiSearch, FiEdit3, FiBook, FiUser, FiSettings } from 'react-icons/fi';
 
-function ChatHistory({ userId, userEmail, onSelectChat, selectedChat, refresh }) {
+function ChatHistory({ userId, userEmail, onSelectChat, selectedChat, refresh, showProfile, setShowProfile }) {
     const [chats, setChats] = useState([]);
     const [error, setError] = useState('');
     const [editingId, setEditingId] = useState(null);
@@ -276,21 +276,41 @@ function ChatHistory({ userId, userEmail, onSelectChat, selectedChat, refresh })
                 color: '#b6b6b6',
                 flexShrink: 0
             }}>
-                <div style={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: '50%',
-                    background: '#444654',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontWeight: 700,
-                    fontSize: 17,
-                    color: '#fff',
+
+                <span style={{ 
+                    fontWeight: 500, 
+                    flex: 1,
+                    fontSize: 15,
+                    color: '#b6b6b6'
                 }}>
-                    <FiUser size={18} />
-                </div>
-                <span style={{ fontWeight: 500 }}>{userEmail}</span>
+                    {userEmail}
+                </span>
+                <button
+                    onClick={() => setShowProfile(true)}
+                    style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: '#b6b6b6',
+                        cursor: 'pointer',
+                        padding: '6px',
+                        borderRadius: 6,
+                        transition: 'all 0.2s ease',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                    }}
+                    onMouseEnter={(e) => {
+                        e.target.style.color = '#1ee87a';
+                        e.target.style.background = '#343541';
+                    }}
+                    onMouseLeave={(e) => {
+                        e.target.style.color = '#b6b6b6';
+                        e.target.style.background = 'transparent';
+                    }}
+                    title="Configuración del perfil"
+                >
+                    <FiSettings size={16} />
+                </button>
             </div>
         </div>
     );

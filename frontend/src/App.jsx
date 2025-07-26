@@ -5,6 +5,7 @@ import Login from './components/login';
 import Chat from './components/chat';
 import ChatHistory from './components/chatHistory';
 import Navbar from './components/navbar';
+import Profile from './components/profile';
 import './app.css';
 
 function App() {
@@ -12,6 +13,7 @@ function App() {
   const [selectedChat, setSelectedChat] = useState(null);
   const [refreshHistory, setRefreshHistory] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [showProfile, setShowProfile] = useState(false);
 
   // Escuchar cambios en la autenticación
   useEffect(() => {
@@ -81,6 +83,8 @@ function App() {
             onSelectChat={setSelectedChat} 
             selectedChat={selectedChat} 
             refresh={refreshHistory} 
+            showProfile={showProfile}
+            setShowProfile={setShowProfile}
           />
         </aside>
         <main className="chatbox" style={{ display: 'flex', flexDirection: 'column', flex: 1, height: '100%' }}>
@@ -93,6 +97,7 @@ function App() {
           </div>
         </main>
       </div>
+      {showProfile && <Profile onClose={() => setShowProfile(false)} />}
     </>
   );
 }
