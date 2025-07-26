@@ -1,0 +1,150 @@
+Quiero que me guíes paso a paso para preparar mi aplicación web fullstack en producción.
+
+Estoy usando React + Vite en el frontend, y Python Flask + SQLite (temporal) en el backend. Todo el código está versionado en GitHub, con la siguiente estructura de carpetas:
+
+/frontend → React + Vite  
+/backend  → Python Flask + SQLite
+
+---
+
+🎯 Objetivo
+
+Tener la app deployada y funcionando, con:
+
+- Autenticación y roles de usuario ("free" / "premium")
+- Conexión del backend a OpenAI para generar respuestas
+- Control de acceso en el frontend según el rol
+- Almacenamiento de archivos adjuntos
+- Historial de chat por usuario (limitado a últimos 5)
+- Deploy en producción del frontend y backend
+
+---
+
+🔸 Infraestructura deseada
+
+- Hosting gratuito para el frontend (Firebase Hosting o Vercel)
+- Hosting gratuito para el backend (Railway o Render)
+- Firebase para:
+  - Autenticación (Firebase Auth)
+  - Base de datos (Firestore)
+  - Almacenamiento de archivos (Storage, opcional)
+
+---
+
+🔸 Requisitos funcionales
+
+1. Autenticación con Firebase (email/password, opcionalmente Google)
+2. Dos roles: "premium" (puede chatear) y "free" (solo lectura)
+3. Control de acceso en frontend: si el usuario no es premium, desactivar input del chat
+4. Conexión del backend Flask con OpenAI API
+5. Almacenamiento del historial de chats (últimos 5) por usuario
+6. Envío de archivos adjuntos desde frontend (procesados por backend)
+7. Deploy final:
+   - Frontend: en Firebase Hosting o Vercel
+   - Backend: en Railway (con variables de entorno y CORS habilitado)
+   - Dominio opcional
+
+---
+
+🔸 Flujo de trabajo ideal
+
+- Preparar entorno `.env` en frontend y backend
+- Integrar Firebase Auth en React (login, logout, sesión)
+- Guardar datos del usuario + rol en Firestore al registrarse
+- Añadir middleware de autenticación en Flask (verificar JWT ID Token de Firebase)
+- Implementar en backend rutas:
+   - `/chat` (envía mensaje y archivo a OpenAI)
+   - `/upload` (procesar imagen o guardar)
+- Conectar frontend a backend usando fetch con ID Token de Firebase
+- En producción: deploy de frontend (Firebase Hosting) y backend (Railway)
+- Asegurar seguridad mínima: CORS, variables secretas, manejo de errores
+
+---
+
+🧱 Arquitectura recomendada
+
+| Componente           | Herramienta elegida        |
+|----------------------|-----------------------------|
+| Autenticación        | Firebase Auth               |
+| Base de datos        | Firebase Firestore          |
+| Archivos adjuntos    | Firebase Storage            |
+| Backend API          | Flask en Railway            |
+| Frontend             | React + Vite (deploy en Firebase) |
+| Roles y permisos     | Guardados en Firestore, verificados en frontend y backend |
+| Procesamiento de archivos | Backend Flask con análisis OpenAI |
+
+---
+
+📁 Firestore: estructura sugerida
+
+users/  
+  userId (Firebase UID)  
+    - nombre: string  
+    - apellido: string  
+    - email: string  
+    - pais: string  
+    - fechaAlta: timestamp  
+    - rol: "free" | "premium"  
+
+chats/  
+  userId/  
+    chatId/  
+      - mensajeUsuario: string  
+      - respuestaBot: string  
+      - timestamp: timestamp  
+      - archivoURL?: string  
+
+Limitar a últimos 5 chats por usuario: si se guarda el sexto, eliminar el más antiguo. Esto se puede hacer desde el backend Flask (sin usar Firebase Functions por ahora).
+
+---
+
+🔐 Flujo de autenticación y permisos
+
+1. Usuario se registra o loguea con Firebase Auth
+2. Al registrarse, se crea el documento del usuario en Firestore con rol "free"
+3. Al iniciar sesión, el frontend consulta el rol desde Firestore
+4. Si es "premium", se habilita el input del chat
+5. Cada request al backend `/chat` o `/upload` debe enviar el JWT ID Token de Firebase
+6. El backend verifica la identidad y el rol del usuario antes de responder
+
+---
+
+🛠️ Roadmap de desarrollo
+
+**Fase 1: Autenticación con Firebase (1–2 días)**  
+- Configurar Firebase project  
+- Habilitar Firebase Auth (email/password)  
+- Agregar `firebase.js` al frontend  
+- Implementar `register`, `login`, `logout` en React  
+- Crear documento en Firestore con datos y rol al registrar  
+
+**Fase 2: Control de acceso en frontend (1 día)**  
+- Crear contexto de usuario (React Context API)  
+- Consultar Firestore al cargar sesión  
+- Mostrar u ocultar input de chat según el rol  
+
+**Fase 3: Backend con Flask y protección (1–2 días)**  
+- Verificar JWT ID Token con SDK Firebase Admin  
+- Revisar rol del usuario antes de responder  
+- Ruta `/chat`: recibe mensaje + archivo (si lo hay)  
+- Procesa con OpenAI y responde  
+- Ruta `/upload`: subir archivo o procesarlo en Flask  
+
+**Fase 4: Historial de chat (1 día)**  
+- Guardar mensaje y respuesta en Firestore  
+- Eliminar el más antiguo si hay más de 5  
+
+**Fase 5: Deploy (1 día)**  
+- Frontend: Firebase Hosting (`vite build`)  
+- Backend: Railway (configurar CORS, vars de entorno)  
+- Test completo del flujo en producción
+
+---
+
+🔎 Mostrame cada etapa con:
+
+- Comandos exactos a ejecutar
+- Archivos a modificar con ejemplos de código
+- Configuraciones necesarias (.env, Firebase, Railway)
+- Buenas prácticas de seguridad y manejo de errores en Flask
+- Cómo probar todo el sistema de forma local y luego en producción

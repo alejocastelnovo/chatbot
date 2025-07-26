@@ -1,0 +1,37 @@
+# Node
+node_modules/
+frontend/node_modules/
+
+# Build
+frontend/dist/
+
+# Logs
+*.log
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+venv/
+env/
+backend/instance/
+
+# Database
+*.db
+*.sqlite3
+backend/instance/database.db
+
+# Entornos y variables
+.env
+.env.*
+backend/.env
+
+# IDEs
+.vscode/
+.idea/
+.DS_Store
+
+# Otros
+package-lock.json
+frontend/package-lock.json 
