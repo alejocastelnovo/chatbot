@@ -17,7 +17,45 @@ function Chat({ userId, selectedChat, onNewChat, onChatCreated }) {
     const [inputFocus, setInputFocus] = useState(false);
     const [windowWidth, setWindowWidth] = useState(window.innerWidth);
     const typingInterval = useRef(null);
-    const typingSpeed = 5; // ms por carácter - más rápido para mejor UX
+    const typingSpeed = 8; // ms por carácter - muy rápido para mejor UX
+
+    // Función para frenar la escritura (mostrar solo lo escrito)
+    const stopTyping = () => {
+        if (typingInterval.current) {
+            clearTimeout(typingInterval.current);
+        }
+        setIsTyping(false);
+        
+        // Agregar solo el texto que ya se escribió
+        if (typingText) {
+            setMensajes(prev => [
+                ...prev,
+                { sender: 'bot', text: typingText }
+            ]);
+        }
+        
+        setTypingText('');
+        setFullResponse('');
+    };
+
+    // Función para completar la escritura (mostrar todo)
+    const completeTyping = () => {
+        if (typingInterval.current) {
+            clearTimeout(typingInterval.current);
+        }
+        setIsTyping(false);
+        
+        // Agregar el texto completo
+        if (fullResponse) {
+            setMensajes(prev => [
+                ...prev,
+                { sender: 'bot', text: fullResponse }
+            ]);
+        }
+        
+        setTypingText('');
+        setFullResponse('');
+    };
 
     // Hook para detectar cambios en el tamaño de la ventana
     useEffect(() => {
@@ -76,7 +114,7 @@ function Chat({ userId, selectedChat, onNewChat, onChatCreated }) {
         chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [mensajes, typingText]);
 
-    // Función mejorada para simular escritura
+    // Función optimizada para simular escritura
     const simulateTyping = (text) => {
         setIsTyping(true);
         setTypingText('');
@@ -86,18 +124,24 @@ function Chat({ userId, selectedChat, onNewChat, onChatCreated }) {
         
         const typeNextChar = () => {
             if (currentIndex < text.length) {
-                setTypingText(prev => prev + text[currentIndex]);
-                currentIndex++;
-                typingInterval.current = setTimeout(typeNextChar, typingSpeed);
-            } else {
-                // Terminó de escribir
-                setIsTyping(false);
-                setMensajes(prev => [
-                    ...prev,
-                    { sender: 'bot', text: text }
-                ]);
-                setTypingText('');
-                setFullResponse('');
+                // Agregar múltiples caracteres a la vez para mayor velocidad
+                const charsToAdd = Math.min(5, text.length - currentIndex);
+                const newText = text.slice(currentIndex, currentIndex + charsToAdd);
+                setTypingText(prev => prev + newText);
+                currentIndex += charsToAdd;
+                
+                if (currentIndex < text.length) {
+                    typingInterval.current = setTimeout(typeNextChar, typingSpeed);
+                } else {
+                    // Terminó de escribir
+                    setIsTyping(false);
+                    setMensajes(prev => [
+                        ...prev,
+                        { sender: 'bot', text: text }
+                    ]);
+                    setTypingText('');
+                    setFullResponse('');
+                }
             }
         };
         
@@ -182,6 +226,29 @@ function Chat({ userId, selectedChat, onNewChat, onChatCreated }) {
             }
         };
     }, []);
+
+    // Atajos de teclado durante la escritura
+    useEffect(() => {
+        const handleKeyPress = (e) => {
+            if (isTyping) {
+                if (e.key === 'Escape') {
+                    stopTyping(); // Frenar (mostrar solo lo escrito)
+                } else if (e.key === 'Enter') {
+                    completeTyping(); // Completar (mostrar todo)
+                }
+            }
+        };
+
+        if (isTyping) {
+            document.addEventListener('keydown', handleKeyPress);
+        }
+
+        return () => {
+            document.removeEventListener('keydown', handleKeyPress);
+        };
+    }, [isTyping]);
+
+
 
     return (
         <div style={{
@@ -438,7 +505,7 @@ function Chat({ userId, selectedChat, onNewChat, onChatCreated }) {
                         </div>
                     ))}
                     
-                    {/* Indicador de escritura mejorado */}
+                    {/* Indicador de escritura */}
                     {isTyping && (
                         <div style={{ display: 'flex', justifyContent: 'flex-start', width: '100%' }}>
                             <span
@@ -453,123 +520,122 @@ function Chat({ userId, selectedChat, onNewChat, onChatCreated }) {
                                     boxShadow: '0 2px 8px #0002',
                                     marginLeft: 16,
                                     border: '1.5px solid #232526',
-                                    position: 'relative',
                                 }}
                             >
                                 <div className="chat-markdown">
                                     <ReactMarkdown
                                         children={typingText}
                                         components={{
-                                        h1: ({node, ...props}) => <h1 style={{
-                                            fontSize: windowWidth <= 1366 ? 18 : 22, 
-                                            fontWeight: 700, 
-                                            margin: '16px 0 8px 0',
-                                            color: '#fff'
-                                        }} {...props} />,
-                                        h2: ({node, ...props}) => <h2 style={{
-                                            fontSize: windowWidth <= 1366 ? 16 : 18, 
-                                            fontWeight: 700, 
-                                            margin: '12px 0 6px 0',
-                                            color: '#fff'
-                                        }} {...props} />,
-                                        h3: ({node, ...props}) => <h3 style={{
-                                            fontSize: windowWidth <= 1366 ? 14 : 16, 
-                                            fontWeight: 600, 
-                                            margin: '10px 0 5px 0',
-                                            color: '#fff'
-                                        }} {...props} />,
-                                        p: ({node, ...props}) => <p style={{
-                                            margin: '8px 0',
-                                            lineHeight: 1.5,
-                                            color: '#fff'
-                                        }} {...props} />,
-                                        ul: ({node, ...props}) => <ul style={{
-                                            margin: '8px 0',
-                                            paddingLeft: 20,
-                                            color: '#fff'
-                                        }} {...props} />,
-                                        ol: ({node, ...props}) => <ol style={{
-                                            margin: '8px 0',
-                                            paddingLeft: 20,
-                                            color: '#fff'
-                                        }} {...props} />,
-                                        li: ({node, ...props}) => <li style={{
-                                            marginBottom: 4,
-                                            lineHeight: 1.4,
-                                            color: '#fff'
-                                        }} {...props} />,
-                                        strong: ({node, ...props}) => <strong style={{
-                                            fontWeight: 700,
-                                            color: '#1ee87a'
-                                        }} {...props} />,
-                                        em: ({node, ...props}) => <em style={{
-                                            fontStyle: 'italic',
-                                            color: '#b6b6b6'
-                                        }} {...props} />,
-                                        code: ({node, inline, ...props}) => inline ? (
-                                            <code style={{
-                                                background: '#232526',
-                                                padding: '2px 6px',
-                                                borderRadius: 4,
-                                                fontSize: '0.9em',
-                                                fontFamily: 'monospace',
+                                            h1: ({node, ...props}) => <h1 style={{
+                                                fontSize: windowWidth <= 1366 ? 18 : 22, 
+                                                fontWeight: 700, 
+                                                margin: '16px 0 8px 0',
+                                                color: '#fff'
+                                            }} {...props} />,
+                                            h2: ({node, ...props}) => <h2 style={{
+                                                fontSize: windowWidth <= 1366 ? 16 : 18, 
+                                                fontWeight: 700, 
+                                                margin: '12px 0 6px 0',
+                                                color: '#fff'
+                                            }} {...props} />,
+                                            h3: ({node, ...props}) => <h3 style={{
+                                                fontSize: windowWidth <= 1366 ? 14 : 16, 
+                                                fontWeight: 600, 
+                                                margin: '10px 0 5px 0',
+                                                color: '#fff'
+                                            }} {...props} />,
+                                            p: ({node, ...props}) => <p style={{
+                                                margin: '8px 0',
+                                                lineHeight: 1.5,
+                                                color: '#fff'
+                                            }} {...props} />,
+                                            ul: ({node, ...props}) => <ul style={{
+                                                margin: '8px 0',
+                                                paddingLeft: 20,
+                                                color: '#fff'
+                                            }} {...props} />,
+                                            ol: ({node, ...props}) => <ol style={{
+                                                margin: '8px 0',
+                                                paddingLeft: 20,
+                                                color: '#fff'
+                                            }} {...props} />,
+                                            li: ({node, ...props}) => <li style={{
+                                                marginBottom: 4,
+                                                lineHeight: 1.4,
+                                                color: '#fff'
+                                            }} {...props} />,
+                                            strong: ({node, ...props}) => <strong style={{
+                                                fontWeight: 700,
                                                 color: '#1ee87a'
-                                            }} {...props} />
-                                        ) : (
-                                            <pre style={{
-                                                background: '#232526',
-                                                padding: 12,
-                                                borderRadius: 8,
-                                                overflow: 'auto',
-                                                margin: '12px 0',
-                                                border: '1px solid #343541'
-                                            }}>
+                                            }} {...props} />,
+                                            em: ({node, ...props}) => <em style={{
+                                                fontStyle: 'italic',
+                                                color: '#b6b6b6'
+                                            }} {...props} />,
+                                            code: ({node, inline, ...props}) => inline ? (
                                                 <code style={{
+                                                    background: '#232526',
+                                                    padding: '2px 6px',
+                                                    borderRadius: 4,
+                                                    fontSize: '0.9em',
                                                     fontFamily: 'monospace',
-                                                    fontSize: windowWidth <= 1366 ? 12 : 14,
-                                                    color: '#fff',
-                                                    lineHeight: 1.4
+                                                    color: '#1ee87a'
                                                 }} {...props} />
-                                            </pre>
-                                        ),
-                                        blockquote: ({node, ...props}) => <blockquote style={{
-                                            borderLeft: '4px solid #1ee87a',
-                                            paddingLeft: 16,
-                                            margin: '12px 0',
-                                            fontStyle: 'italic',
-                                            color: '#b6b6b6',
-                                            background: '#2a2f3a',
-                                            padding: '8px 16px',
-                                            borderRadius: '0 8px 8px 0'
-                                        }} {...props} />,
-                                        table: ({node, ...props}) => <div style={{
-                                            overflow: 'auto',
-                                            margin: '12px 0'
-                                        }}>
-                                            <table style={{
-                                                borderCollapse: 'collapse',
-                                                width: '100%',
-                                                background: '#232526',
-                                                borderRadius: 8,
-                                                overflow: 'hidden'
-                                            }} {...props} />
-                                        </div>,
-                                        th: ({node, ...props}) => <th style={{
-                                            background: '#343541',
-                                            padding: '8px 12px',
-                                            textAlign: 'left',
-                                            borderBottom: '1px solid #444654',
-                                            fontWeight: 600,
-                                            color: '#fff'
-                                        }} {...props} />,
-                                        td: ({node, ...props}) => <td style={{
-                                            padding: '8px 12px',
-                                            borderBottom: '1px solid #444654',
-                                            color: '#fff'
-                                        }} {...props} />,
-                                                                            }}
+                                            ) : (
+                                                <pre style={{
+                                                    background: '#232526',
+                                                    padding: 12,
+                                                    borderRadius: 8,
+                                                    overflow: 'auto',
+                                                    margin: '12px 0',
+                                                    border: '1px solid #343541'
+                                                }}>
+                                                    <code style={{
+                                                        fontFamily: 'monospace',
+                                                        fontSize: windowWidth <= 1366 ? 12 : 14,
+                                                        color: '#fff',
+                                                        lineHeight: 1.4
+                                                    }} {...props} />
+                                                </pre>
+                                            ),
+                                            blockquote: ({node, ...props}) => <blockquote style={{
+                                                borderLeft: '4px solid #1ee87a',
+                                                paddingLeft: 16,
+                                                margin: '12px 0',
+                                                fontStyle: 'italic',
+                                                color: '#b6b6b6',
+                                                background: '#2a2f3a',
+                                                padding: '8px 16px',
+                                                borderRadius: '0 8px 8px 0'
+                                            }} {...props} />,
+                                            table: ({node, ...props}) => <div style={{
+                                                overflow: 'auto',
+                                                margin: '12px 0'
+                                            }}>
+                                                <table style={{
+                                                    borderCollapse: 'collapse',
+                                                    width: '100%',
+                                                    background: '#232526',
+                                                    borderRadius: 8,
+                                                    overflow: 'hidden'
+                                                }} {...props} />
+                                            </div>,
+                                            th: ({node, ...props}) => <th style={{
+                                                background: '#343541',
+                                                padding: '8px 12px',
+                                                textAlign: 'left',
+                                                borderBottom: '1px solid #444654',
+                                                fontWeight: 600,
+                                                color: '#fff'
+                                            }} {...props} />,
+                                            td: ({node, ...props}) => <td style={{
+                                                padding: '8px 12px',
+                                                borderBottom: '1px solid #444654',
+                                                color: '#fff'
+                                            }} {...props} />,
+                                        }}
                                     />
-                                    </div>
+                                </div>
                                 <span 
                                     style={{
                                         display: 'inline-block',
@@ -581,6 +647,17 @@ function Chat({ userId, selectedChat, onNewChat, onChatCreated }) {
                                         verticalAlign: 'middle'
                                     }}
                                 />
+                                {/* Indicador de atajos */}
+                                <div style={{
+                                    position: 'absolute',
+                                    bottom: '-20px',
+                                    left: '20px',
+                                    fontSize: '10px',
+                                    color: '#666',
+                                    fontStyle: 'italic'
+                                }}>
+                                    ESC: frenar • ENTER: completar
+                                </div>
                             </span>
                         </div>
                     )}
@@ -621,32 +698,41 @@ function Chat({ userId, selectedChat, onNewChat, onChatCreated }) {
                         }}
                     />
                     <button
-                        type="submit"
-                        disabled={userRole !== 'premium' || loading || isTyping}
+                        type={isTyping ? "button" : "submit"}
+                        onClick={isTyping ? stopTyping : undefined}
+                        disabled={userRole !== 'premium' || loading}
                         style={{
                             padding: windowWidth <= 1366 ? '0 24px' : '0 32px',
                             borderRadius: 12,
                             border: 'none',
-                            background: userRole !== 'premium' ? '#666' : (loading || isTyping ? '#5c5f70' : '#444654'),
+                            background: userRole !== 'premium' ? '#666' : (loading ? '#5c5f70' : isTyping ? '#ff6b6b' : '#444654'),
                             color: '#fff',
                             fontWeight: 'bold',
                             fontSize: windowWidth <= 1366 ? 16 : 18,
-                            cursor: userRole !== 'premium' || loading || isTyping ? 'not-allowed' : 'pointer',
+                            cursor: userRole !== 'premium' || loading ? 'not-allowed' : 'pointer',
                             boxShadow: '0 2px 8px #0002',
                             transition: 'background 0.2s, color 0.2s',
                         }}
                         onMouseOver={e => {
-                            if (userRole === 'premium' && !loading && !isTyping) {
-                                e.currentTarget.style.background = '#5c5f70';
+                            if (userRole === 'premium' && !loading) {
+                                if (isTyping) {
+                                    e.currentTarget.style.background = '#ff5252';
+                                } else {
+                                    e.currentTarget.style.background = '#5c5f70';
+                                }
                             }
                         }}
                         onMouseOut={e => {
-                            if (userRole === 'premium' && !loading && !isTyping) {
-                                e.currentTarget.style.background = '#444654';
+                            if (userRole === 'premium' && !loading) {
+                                if (isTyping) {
+                                    e.currentTarget.style.background = '#ff6b6b';
+                                } else {
+                                    e.currentTarget.style.background = '#444654';
+                                }
                             }
                         }}
                     >
-                        {loading ? 'Enviando...' : isTyping ? 'Escribiendo...' : (userRole === 'premium' ? 'Enviar' : 'Premium')}
+                        {loading ? 'Enviando...' : isTyping ? 'Frenar' : (userRole === 'premium' ? 'Enviar' : 'Premium')}
                     </button>
                 </form>
                 {error && <p style={{ color: 'red', textAlign: 'center', marginTop: 8 }}>{error}</p>}

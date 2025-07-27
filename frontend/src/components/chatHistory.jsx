@@ -57,22 +57,25 @@ function ChatHistory({ userId, userEmail, onSelectChat, selectedChat, refresh, s
     // Estilo para la lista de chats
     const chatItemStyle = (isSelected) => ({
         width: '100%',
-        padding: '10px 14px',
+        padding: '12px 12px',
         border: 'none',
         background: isSelected ? '#232f4b' : 'transparent',
         color: isSelected ? '#3b82f6' : '#fff',
-        borderRadius: 8,
+        borderRadius: 10,
         textAlign: 'left',
         fontWeight: isSelected ? 600 : 500,
-        fontSize: 15,
+        fontSize: 14,
         cursor: 'pointer',
-        marginBottom: 2,
+        marginBottom: 4,
         transition: 'background 0.15s, color 0.15s',
         outline: 'none',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
         userSelect: 'none', // Para evitar selección de texto
+        minWidth: 0, // Permitir que se ajuste al contenedor
+        gap: 8, // Espacio entre título y botón
+        boxSizing: 'border-box', // Incluir padding en el ancho total
     });
 
     // Acciones de la parte superior
@@ -80,18 +83,20 @@ function ChatHistory({ userId, userEmail, onSelectChat, selectedChat, refresh, s
         width: '100%',
         display: 'flex',
         alignItems: 'center',
-        gap: 10,
-        padding: '10px 14px',
+        gap: 8,
+        padding: '12px 12px',
         border: 'none',
         background: 'transparent',
         color: '#fff',
         fontWeight: 500,
-        fontSize: 15,
-        borderRadius: 8,
+        fontSize: 14,
+        borderRadius: 10,
         cursor: 'pointer',
-        marginBottom: 2,
+        marginBottom: 4,
         transition: 'background 0.15s, color 0.15s',
         outline: 'none',
+        minWidth: 0, // Permitir que se ajuste al contenedor
+        boxSizing: 'border-box', // Incluir padding en el ancho total
     };
 
     const handleDelete = async (chat_id) => {
@@ -163,12 +168,13 @@ function ChatHistory({ userId, userEmail, onSelectChat, selectedChat, refresh, s
             height: '100vh',
             background: '#23272f',
             color: '#fff',
-            padding: 0,
+            padding: '0 12px 0 12px', // Reducir padding para más espacio
             position: 'relative',
             minWidth: 0,
+            overflow: 'hidden', // Prevenir scroll horizontal
         }}>
             {/* Acciones */}
-            <div style={{ padding: 20, paddingBottom: 10, borderBottom: '1px solid #343541' }}>
+            <div style={{ padding: '24px 0 16px 0', borderBottom: '1px solid #343541' }}>
                 <button
                     style={{ ...actionBtnStyle, color: '#1ee87a' }}
                     onClick={async () => {
@@ -209,7 +215,7 @@ function ChatHistory({ userId, userEmail, onSelectChat, selectedChat, refresh, s
                 >
                     <FiEdit3 size={18} /> Nuevo chat
                 </button>
-                <div style={{ height: 8 }} />
+                <div style={{ height: 12 }} />
                 <div style={{ position: 'relative' }}>
                     <FiSearch style={{ position: 'absolute', left: 12, top: 12, color: '#b6b6b6', fontSize: 17 }} />
                     <input
@@ -220,24 +226,25 @@ function ChatHistory({ userId, userEmail, onSelectChat, selectedChat, refresh, s
                         style={{
                             width: '100%',
                             padding: '8px 8px 8px 36px',
-                            borderRadius: 8,
+                            borderRadius: 10,
                             border: '1.5px solid #232526',
                             background: '#23272f',
                             color: '#fff',
-                            fontSize: 15,
-                            marginBottom: 8,
+                            fontSize: 14,
+                            marginBottom: 12,
                             outline: 'none',
+                            boxSizing: 'border-box',
                         }}
                     />
                 </div>
-                <div style={{ height: 4 }} />
+                <div style={{ height: 8 }} />
                 <button
                     style={{ ...actionBtnStyle, color: '#3b82f6', fontSize: 13 }}
                     onClick={fetchHistory}
                     onMouseEnter={e => { e.target.style.background = '#232f4b'; }}
                     onMouseLeave={e => { e.target.style.background = 'transparent'; }}
                 >
-                    🔄 Actualizar historial
+                    Actualizar historial
                 </button>
                 {chats.length > 0 && (
                     <button
@@ -252,13 +259,13 @@ function ChatHistory({ userId, userEmail, onSelectChat, selectedChat, refresh, s
             </div>
 
             {/* Lista de chats con scroll */}
-            <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, padding: '10px 0 10px 0' }}>
-                <div style={{ padding: '0 10px' }}>
-                    <div style={{ color: '#b6b6b6', fontSize: 13, margin: '8px 0 6px 6px', letterSpacing: 1 }}>
+            <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', minHeight: 0, padding: '16px 0 16px 0' }}>
+                <div style={{ padding: '0 0' }}>
+                    <div style={{ color: '#b6b6b6', fontSize: 13, margin: '12px 0 8px 0', letterSpacing: 1 }}>
                         {loading ? 'Cargando...' : `Chats (${chats.length})`}
                     </div>
                 </div>
-                <ul style={{ listStyle: 'none', padding: '0 10px', margin: 0 }}>
+                <ul style={{ listStyle: 'none', padding: '0 0', margin: 0 }}>
                     {chats.filter(chat => {
                         const firstUserMsg = chat.mensajes.find(m => m.sender === 'user');
                         const title = firstUserMsg ? firstUserMsg.text.toLowerCase() : '';
@@ -278,10 +285,16 @@ function ChatHistory({ userId, userEmail, onSelectChat, selectedChat, refresh, s
                                     <span style={{ 
                                         fontWeight: 500,
                                         color: isEmpty ? '#888' : '#fff',
-                                        fontStyle: isEmpty ? 'italic' : 'normal'
+                                        fontStyle: isEmpty ? 'italic' : 'normal',
+                                        flex: 1,
+                                        minWidth: 0,
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        whiteSpace: 'nowrap',
+                                        paddingRight: 4, // Pequeño espacio antes del botón
                                     }}>
                                         {firstUserMsg ? 
-                                            firstUserMsg.text.slice(0, 40) + (firstUserMsg.text.length > 40 ? '...' : '') : 
+                                            firstUserMsg.text.slice(0, 35) + (firstUserMsg.text.length > 35 ? '...' : '') : 
                                             'Chat nuevo'
                                         }
                                     </span>
@@ -291,14 +304,29 @@ function ChatHistory({ userId, userEmail, onSelectChat, selectedChat, refresh, s
                                             handleDelete(chat.chat_id);
                                         }}
                                         style={{
-                                            marginLeft: 12,
                                             background: 'transparent',
                                             color: '#ff4d4f',
                                             border: 'none',
                                             cursor: 'pointer',
                                             fontWeight: 'bold',
-                                            fontSize: 18,
-                                            transition: 'color 0.2s',
+                                            fontSize: 16,
+                                            transition: 'all 0.2s ease',
+                                            padding: '4px 6px',
+                                            borderRadius: 4,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            minWidth: '24px',
+                                            height: '24px',
+                                            flexShrink: 0,
+                                        }}
+                                        onMouseEnter={e => {
+                                            e.target.style.background = '#2d1b1b';
+                                            e.target.style.color = '#ff6b6b';
+                                        }}
+                                        onMouseLeave={e => {
+                                            e.target.style.background = 'transparent';
+                                            e.target.style.color = '#ff4d4f';
                                         }}
                                         title="Eliminar chat"
                                     >
@@ -324,7 +352,7 @@ function ChatHistory({ userId, userEmail, onSelectChat, selectedChat, refresh, s
             {/* Pie de usuario SIEMPRE visible */}
             <div style={{
                 borderTop: '1px solid #343541',
-                padding: '16px 18px',
+                padding: '20px 0 16px 0',
                 display: 'flex',
                 alignItems: 'center',
                 gap: 10,
