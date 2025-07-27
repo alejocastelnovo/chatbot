@@ -52,6 +52,43 @@ def require_auth(f):
 def home():
     return "API funcionando con Firebase", 200
 
+@app.route('/create-chat', methods=['POST'])
+@require_auth
+def create_chat():
+    """
+    Crea un nuevo chat vacío
+    """
+    user_id = request.user['uid']
+    user_role = get_user_role(user_id)
+    
+    # Verificar si el usuario es premium
+    if user_role != 'premium':
+        return jsonify({'error': 'Se requiere cuenta premium para crear chats'}), 403
+
+    try:
+        # Crear un nuevo chat
+        chat_ref = db.collection('chats').document(user_id).collection('conversations').document()
+        chat_id = chat_ref.id
+        
+        # Crear el documento del chat con metadata
+        chat_ref.set({
+            'created_at': datetime.now(),
+            'user_id': user_id,
+            'message_count': 0
+        })
+
+        # Limitar a últimos 5 chats
+        limit_chats(user_id)
+
+        return jsonify({
+            'chat_id': chat_id,
+            'message': 'Chat creado exitosamente'
+        })
+
+    except Exception as e:
+        print(f"Error creando chat: {e}")
+        return jsonify({'error': 'Error interno del servidor'}), 500
+
 @app.route('/chat', methods=['POST'])
 @require_auth
 def chat():
@@ -88,12 +125,39 @@ def chat():
         }
         chat_ref.collection('messages').add(message_data)
 
-        # Obtener respuesta de OpenAI
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[{"role": "user", "content": user_message}]
-        )
-        bot_reply = response.choices[0].message.content
+                # Importar funciones especializadas de chat
+        from services.chat import get_trading_analysis, get_quick_analysis
+        
+        # Obtener historial de conversación para contexto
+        conversation_history = []
+        if chat_id:
+            # Obtener mensajes previos del chat actual
+            messages_ref = chat_ref.collection('messages').order_by('timestamp', direction=firestore.Query.ASCENDING)
+            messages_docs = messages_ref.stream()
+            
+            for msg_doc in messages_docs:
+                msg_data = msg_doc.to_dict()
+                role = "assistant" if msg_data['sender'] == 'bot' else "user"
+                conversation_history.append({
+                    "role": role,
+                    "content": msg_data['text']
+                })
+            
+            # Limitar el historial a los últimos 10 mensajes para no exceder tokens
+            conversation_history = conversation_history[-10:]
+        
+        # Determinar el tipo de análisis basado en el mensaje
+        trading_keywords = ['análisis', 'gráfico', 'tendencia', 'soporte', 'resistencia', 
+                          'rsi', 'macd', 'bollinger', 'crypto', 'bitcoin', 'ethereum',
+                          'acciones', 'trading', 'invertir', 'compra', 'venta', 'patrón',
+                          'indicador', 'volumen', 'momentum', 'fibonacci']
+        
+        is_trading_related = any(keyword in user_message.lower() for keyword in trading_keywords)
+        
+        if is_trading_related:
+            bot_reply = get_trading_analysis(user_message, conversation_history=conversation_history)
+        else:
+            bot_reply = get_quick_analysis(user_message, conversation_history=conversation_history)
 
         # Guardar respuesta del bot
         bot_message_data = {
@@ -120,39 +184,80 @@ def chat():
 @require_auth
 def history():
     user_id = request.user['uid']
+    print(f"🔍 Obteniendo historial para usuario: {user_id}")
     
     try:
         # Obtener todos los chats del usuario
         chats_ref = db.collection('chats').document(user_id).collection('conversations')
-        chats = chats_ref.order_by('timestamp', direction=firestore.Query.DESCENDING).limit(5).stream()
+        
+        # Obtener todos los chats sin ordenar primero
+        all_chats = list(chats_ref.stream())
+        print(f"📊 Total de chats encontrados: {len(all_chats)}")
         
         resultado = []
-        for chat in chats:
-            chat_data = chat.to_dict()
-            messages_ref = chat.reference.collection('messages').order_by('timestamp', direction=firestore.Query.ASCENDING)
-            messages = messages_ref.stream()
-            
-            mensajes = []
-            for msg in messages:
-                msg_data = msg.to_dict()
-                mensajes.append({
-                    'id': msg.id,
-                    'sender': msg_data['sender'],
-                    'text': msg_data['text'],
-                    'timestamp': msg_data['timestamp'].isoformat() if msg_data['timestamp'] else None
-                })
-            
-            resultado.append({
-                'chat_id': chat.id,
-                'created_at': chat_data.get('timestamp', datetime.now()).isoformat(),
-                'mensajes': mensajes
-            })
+        for chat in all_chats:
+            try:
+                chat_data = chat.to_dict()
+                print(f"📝 Procesando chat {chat.id}: {chat_data}")
+                
+                # Obtener mensajes del chat
+                messages_ref = chat.reference.collection('messages')
+                messages = list(messages_ref.stream())
+                
+                mensajes = []
+                for msg in messages:
+                    msg_data = msg.to_dict()
+                    mensajes.append({
+                        'id': msg.id,
+                        'sender': msg_data['sender'],
+                        'text': msg_data['text'],
+                        'timestamp': msg_data['timestamp'].isoformat() if msg_data['timestamp'] else None
+                    })
+                
+                # Determinar la fecha de creación
+                created_at = chat_data.get('created_at')
+                if not created_at:
+                    created_at = chat_data.get('timestamp', datetime.now())
+                
+                # Asegurar que created_at sea un datetime
+                if not isinstance(created_at, datetime):
+                    created_at = datetime.now()
+                
+                # Incluir el chat si tiene mensajes o es reciente
+                # Convertir created_at a datetime naive si es necesario
+                if hasattr(created_at, 'replace'):
+                    created_at_naive = created_at.replace(tzinfo=None)
+                else:
+                    created_at_naive = created_at
+                
+                is_recent = (datetime.now() - created_at_naive).total_seconds() < 3600
+                print(f"📅 Chat {chat.id}: created_at={created_at_naive}, is_recent={is_recent}, mensajes={len(mensajes)}")
+                
+                if mensajes or is_recent:
+                    resultado.append({
+                        'chat_id': chat.id,
+                        'created_at': created_at.isoformat(),
+                        'mensajes': mensajes,
+                        'message_count': len(mensajes)
+                    })
+                    print(f"✅ Chat {chat.id} agregado con {len(mensajes)} mensajes")
+                
+            except Exception as chat_error:
+                print(f"❌ Error procesando chat {chat.id}: {chat_error}")
+                continue
         
+        # Ordenar por fecha de creación (más reciente primero)
+        resultado.sort(key=lambda x: x['created_at'], reverse=True)
+        resultado = resultado[:5]  # Limitar a 5 chats
+        
+        print(f"✅ Historial obtenido: {len(resultado)} chats")
         return jsonify({'chats': resultado}), 200
         
     except Exception as e:
-        print(f"Error obteniendo historial: {e}")
-        return jsonify({'error': 'Error obteniendo historial'}), 500
+        print(f"❌ Error obteniendo historial: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Error obteniendo historial: {str(e)}'}), 500
 
 @app.route('/delete_history', methods=['POST'])
 @require_auth
@@ -279,6 +384,39 @@ def update_user_profile():
         print(f"Error actualizando perfil: {e}")
         return jsonify({'error': 'Error actualizando perfil'}), 500
 
+@app.route('/analyze-chart', methods=['POST'])
+@require_auth
+def analyze_chart():
+    """
+    Endpoint para análisis de imágenes de gráficos de trading
+    """
+    data = request.get_json()
+    image_url = data.get('image_url', '')
+    prompt = data.get('prompt', '')
+    
+    if not image_url:
+        return jsonify({'error': 'URL de imagen requerida'}), 400
+
+    user_id = request.user['uid']
+    user_role = get_user_role(user_id)
+    
+    # Verificar si el usuario es premium
+    if user_role != 'premium':
+        return jsonify({'error': 'Se requiere cuenta premium para análisis de gráficos'}), 403
+
+    try:
+        from services.chat import analyze_chart_image
+        analysis = analyze_chart_image(image_url, prompt)
+        
+        return jsonify({
+            'analysis': analysis,
+            'image_url': image_url,
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'Error al analizar el gráfico: {str(e)}'}), 500
+
 @app.route('/user/change-password', methods=['POST'])
 @require_auth
 def change_password():
@@ -373,11 +511,38 @@ def verify_config():
             'error': str(e)
         }), 500
 
+@app.route('/test/firestore', methods=['GET'])
+def test_firestore():
+    """Endpoint para verificar que Firestore funciona"""
+    try:
+        # Intentar hacer una operación simple en Firestore
+        test_ref = db.collection('test').document('test')
+        test_ref.set({'test': 'data', 'timestamp': datetime.now()})
+        test_data = test_ref.get().to_dict()
+        test_ref.delete()  # Limpiar
+        
+        return jsonify({
+            'success': True,
+            'message': 'Firestore funciona correctamente',
+            'test_data': test_data
+        }), 200
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
 def limit_chats(user_id):
     """Limita a 5 chats por usuario, eliminando los más antiguos"""
     try:
         chats_ref = db.collection('chats').document(user_id).collection('conversations')
-        chats = chats_ref.order_by('timestamp', direction=firestore.Query.DESCENDING).stream()
+        
+        # Intentar ordenar por created_at, si falla usar timestamp
+        try:
+            chats = chats_ref.order_by('created_at', direction=firestore.Query.DESCENDING).stream()
+        except:
+            # Fallback para chats antiguos
+            chats = chats_ref.order_by('timestamp', direction=firestore.Query.DESCENDING).stream()
         
         chat_list = list(chats)
         if len(chat_list) > 5:
@@ -389,8 +554,43 @@ def limit_chats(user_id):
                     msg.reference.delete()
                 # Eliminar chat
                 chat.reference.delete()
+        
+        # Limpiar chats vacíos antiguos (más de 1 hora sin mensajes)
+        clean_empty_chats(user_id)
     except Exception as e:
         print(f"Error limitando chats: {e}")
+
+def clean_empty_chats(user_id):
+    """Elimina chats vacíos que tienen más de 1 hora sin mensajes"""
+    try:
+        chats_ref = db.collection('chats').document(user_id).collection('conversations')
+        chats = chats_ref.stream()
+        
+        for chat in chats:
+            chat_data = chat.to_dict()
+            created_at = chat_data.get('created_at', datetime.now())
+            
+            # Asegurar que created_at sea un datetime
+            if not isinstance(created_at, datetime):
+                created_at = datetime.now()
+            
+            # Verificar si el chat tiene mensajes
+            messages = chat.reference.collection('messages').limit(1).stream()
+            has_messages = len(list(messages)) > 0
+            
+            # Si no tiene mensajes y es más antiguo que 1 hora, eliminarlo
+            # Convertir created_at a datetime naive si es necesario
+            if hasattr(created_at, 'replace'):
+                created_at_naive = created_at.replace(tzinfo=None)
+            else:
+                created_at_naive = created_at
+                
+            if not has_messages and (datetime.now() - created_at_naive).total_seconds() > 3600:
+                chat.reference.delete()
+                print(f"Chat vacío eliminado: {chat.id}")
+                
+    except Exception as e:
+        print(f"Error limpiando chats vacíos: {e}")
 
 if __name__ == '__main__':
     app.run(debug=True)

@@ -51,6 +51,10 @@ function App() {
     setRefreshHistory(r => !r); // Cambia el valor para forzar el useEffect en ChatHistory
   };
 
+  const handleChatCreated = () => {
+    setRefreshHistory(r => !r); // Refrescar historial cuando se crea un chat
+  };
+
   // Mostrar loading mientras se verifica la autenticación
   if (loading) {
     return (
@@ -85,6 +89,7 @@ function App() {
             refresh={refreshHistory} 
             showProfile={showProfile}
             setShowProfile={setShowProfile}
+            onChatCreated={handleChatCreated}
           />
         </aside>
         <main className="chatbox" style={{ display: 'flex', flexDirection: 'column', flex: 1, height: '100%' }}>
@@ -93,6 +98,7 @@ function App() {
               userId={user.user_id} 
               selectedChat={selectedChat} 
               onNewChat={handleNewChat} 
+              onChatCreated={handleChatCreated}
             />
           </div>
         </main>

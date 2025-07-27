@@ -3,18 +3,21 @@ import { auth } from '../firebase';
 import optradingblanco from '../assets/optradingblanco.png';
 import ReactMarkdown from 'react-markdown';
 
-function Chat({ userId, selectedChat, onNewChat }) {
+function Chat({ userId, selectedChat, onNewChat, onChatCreated }) {
     const [mensaje, setMensaje] = useState('');
     const [mensajes, setMensajes] = useState([]);
     const [chatId, setChatId] = useState(null);
     const [error, setError] = useState('');
     const [userRole, setUserRole] = useState('free');
     const [loading, setLoading] = useState(false);
+    const [isTyping, setIsTyping] = useState(false);
+    const [typingText, setTypingText] = useState('');
+    const [fullResponse, setFullResponse] = useState('');
     const chatEndRef = useRef(null);
     const [inputFocus, setInputFocus] = useState(false);
-    const [typingBotMsg, setTypingBotMsg] = useState('');
-    const typingTimeout = useRef(null);
     const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+    const typingInterval = useRef(null);
+    const typingSpeed = 5; // ms por carácter - más rápido para mejor UX
 
     // Hook para detectar cambios en el tamaño de la ventana
     useEffect(() => {
@@ -29,7 +32,7 @@ function Chat({ userId, selectedChat, onNewChat }) {
     // Función para obtener el rol del usuario
     const getUserRole = async () => {
         try {
-            const idToken = await auth.currentUser?.getIdToken(true); // Force refresh
+            const idToken = await auth.currentUser?.getIdToken(true);
             if (idToken) {
                 const res = await fetch('http://127.0.0.1:5000/user/role', {
                     method: 'GET',
@@ -63,6 +66,7 @@ function Chat({ userId, selectedChat, onNewChat }) {
                 text: m.text
             })));
         } else {
+            // Nuevo chat - no establecer chatId hasta que se envíe el primer mensaje
             setChatId(null);
             setMensajes([]);
         }
@@ -70,7 +74,35 @@ function Chat({ userId, selectedChat, onNewChat }) {
 
     useEffect(() => {
         chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [mensajes]);
+    }, [mensajes, typingText]);
+
+    // Función mejorada para simular escritura
+    const simulateTyping = (text) => {
+        setIsTyping(true);
+        setTypingText('');
+        setFullResponse(text);
+        
+        let currentIndex = 0;
+        
+        const typeNextChar = () => {
+            if (currentIndex < text.length) {
+                setTypingText(prev => prev + text[currentIndex]);
+                currentIndex++;
+                typingInterval.current = setTimeout(typeNextChar, typingSpeed);
+            } else {
+                // Terminó de escribir
+                setIsTyping(false);
+                setMensajes(prev => [
+                    ...prev,
+                    { sender: 'bot', text: text }
+                ]);
+                setTypingText('');
+                setFullResponse('');
+            }
+        };
+        
+        typeNextChar();
+    };
 
     const handleSend = async (e) => {
         e.preventDefault();
@@ -83,7 +115,23 @@ function Chat({ userId, selectedChat, onNewChat }) {
             return;
         }
 
+        // Limpiar cualquier escritura en progreso
+        if (typingInterval.current) {
+            clearTimeout(typingInterval.current);
+            setIsTyping(false);
+            setTypingText('');
+        }
+
+        const userMessage = mensaje.trim();
+        setMensaje('');
         setLoading(true);
+
+        // Agregar mensaje del usuario inmediatamente
+        setMensajes(prev => [
+            ...prev,
+            { sender: 'user', text: userMessage }
+        ]);
+
         try {
             const idToken = await auth.currentUser?.getIdToken();
             if (!idToken) {
@@ -99,22 +147,23 @@ function Chat({ userId, selectedChat, onNewChat }) {
                 },
                 body: JSON.stringify({
                     chat_id: chatId,
-                    message: mensaje
+                    message: userMessage
                 }),
             });
+            
             const data = await res.json();
+            
             if (res.ok) {
+                // Si es un nuevo chat (no tenía chatId), actualizar el historial
                 if (!chatId && data.chat_id) {
+                    setChatId(data.chat_id);
+                    // Notificar al componente padre para refrescar el historial
                     onNewChat && onNewChat();
+                    onChatCreated && onChatCreated();
                 }
-                setChatId(data.chat_id);
-                setMensajes(prev => [
-                    ...prev,
-                    { sender: 'user', text: mensaje }
-                ]);
-                setMensaje('');
-                // Efecto de escritura para el bot
-                typeBotMessage(data.reply);
+                
+                // Iniciar efecto de escritura
+                simulateTyping(data.reply);
             } else {
                 setError(data.error || 'Error al enviar mensaje');
             }
@@ -125,34 +174,21 @@ function Chat({ userId, selectedChat, onNewChat }) {
         }
     };
 
-    const typeBotMessage = (fullText) => {
-        setTypingBotMsg('');
-        let i = 0;
-        if (typingTimeout.current) clearTimeout(typingTimeout.current);
-
-        const type = () => {
-            setTypingBotMsg(prev => prev + fullText[i]);
-            i++;
-            if (i < fullText.length) {
-                typingTimeout.current = setTimeout(type, 25); // velocidad de escritura
-            } else {
-                // Cuando termina, lo agrega a la lista de mensajes
-                setMensajes(prev => [
-                    ...prev,
-                    { sender: 'bot', text: fullText }
-                ]);
-                setTypingBotMsg('');
+    // Cleanup al desmontar
+    useEffect(() => {
+        return () => {
+            if (typingInterval.current) {
+                clearTimeout(typingInterval.current);
             }
         };
-        type();
-    };
+    }, []);
 
     return (
         <div style={{
             position: 'relative',
             background: '#23272f',
             borderRadius: 16,
-            minWidth: 0, // importante para flexbox responsive
+            minWidth: 0,
             maxWidth: '100%',
             width: '100%',
             boxShadow: '0 8px 32px 0 rgba(31,38,135,0.18)',
@@ -192,7 +228,7 @@ function Chat({ userId, selectedChat, onNewChat }) {
             }} />
             <div style={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', height: '100%' }}>
                 {/* Header del bot - solo visible cuando no hay mensajes */}
-                {mensajes.length === 0 && (
+                {mensajes.length === 0 && !isTyping && (
                     <div style={{
                         width: '100%',
                         display: 'flex',
@@ -256,7 +292,7 @@ function Chat({ userId, selectedChat, onNewChat }) {
                     display: 'flex',
                     flexDirection: 'column',
                     gap: 12,
-                    minHeight: 0, // para que flexbox no expanda
+                    minHeight: 0,
                 }}>
                     {mensajes.map((m, i) => (
                         <div
@@ -283,6 +319,7 @@ function Chat({ userId, selectedChat, onNewChat }) {
                                 }}
                             >
                                 {m.sender === 'bot' ? (
+                                                                    <div className="chat-markdown">
                                     <ReactMarkdown
                                         children={m.text}
                                         components={{
@@ -395,11 +432,14 @@ function Chat({ userId, selectedChat, onNewChat }) {
                                             }} {...props} />,
                                         }}
                                     />
+                                    </div>
                                 ) : m.text}
                             </span>
                         </div>
                     ))}
-                    {typingBotMsg && (
+                    
+                    {/* Indicador de escritura mejorado */}
+                    {isTyping && (
                         <div style={{ display: 'flex', justifyContent: 'flex-start', width: '100%' }}>
                             <span
                                 style={{
@@ -413,14 +453,138 @@ function Chat({ userId, selectedChat, onNewChat }) {
                                     boxShadow: '0 2px 8px #0002',
                                     marginLeft: 16,
                                     border: '1.5px solid #232526',
-                                    fontStyle: 'italic'
+                                    position: 'relative',
                                 }}
                             >
-                                {typingBotMsg}
-                                <span className='blinking-cursor'>|</span>
+                                <div className="chat-markdown">
+                                    <ReactMarkdown
+                                        children={typingText}
+                                        components={{
+                                        h1: ({node, ...props}) => <h1 style={{
+                                            fontSize: windowWidth <= 1366 ? 18 : 22, 
+                                            fontWeight: 700, 
+                                            margin: '16px 0 8px 0',
+                                            color: '#fff'
+                                        }} {...props} />,
+                                        h2: ({node, ...props}) => <h2 style={{
+                                            fontSize: windowWidth <= 1366 ? 16 : 18, 
+                                            fontWeight: 700, 
+                                            margin: '12px 0 6px 0',
+                                            color: '#fff'
+                                        }} {...props} />,
+                                        h3: ({node, ...props}) => <h3 style={{
+                                            fontSize: windowWidth <= 1366 ? 14 : 16, 
+                                            fontWeight: 600, 
+                                            margin: '10px 0 5px 0',
+                                            color: '#fff'
+                                        }} {...props} />,
+                                        p: ({node, ...props}) => <p style={{
+                                            margin: '8px 0',
+                                            lineHeight: 1.5,
+                                            color: '#fff'
+                                        }} {...props} />,
+                                        ul: ({node, ...props}) => <ul style={{
+                                            margin: '8px 0',
+                                            paddingLeft: 20,
+                                            color: '#fff'
+                                        }} {...props} />,
+                                        ol: ({node, ...props}) => <ol style={{
+                                            margin: '8px 0',
+                                            paddingLeft: 20,
+                                            color: '#fff'
+                                        }} {...props} />,
+                                        li: ({node, ...props}) => <li style={{
+                                            marginBottom: 4,
+                                            lineHeight: 1.4,
+                                            color: '#fff'
+                                        }} {...props} />,
+                                        strong: ({node, ...props}) => <strong style={{
+                                            fontWeight: 700,
+                                            color: '#1ee87a'
+                                        }} {...props} />,
+                                        em: ({node, ...props}) => <em style={{
+                                            fontStyle: 'italic',
+                                            color: '#b6b6b6'
+                                        }} {...props} />,
+                                        code: ({node, inline, ...props}) => inline ? (
+                                            <code style={{
+                                                background: '#232526',
+                                                padding: '2px 6px',
+                                                borderRadius: 4,
+                                                fontSize: '0.9em',
+                                                fontFamily: 'monospace',
+                                                color: '#1ee87a'
+                                            }} {...props} />
+                                        ) : (
+                                            <pre style={{
+                                                background: '#232526',
+                                                padding: 12,
+                                                borderRadius: 8,
+                                                overflow: 'auto',
+                                                margin: '12px 0',
+                                                border: '1px solid #343541'
+                                            }}>
+                                                <code style={{
+                                                    fontFamily: 'monospace',
+                                                    fontSize: windowWidth <= 1366 ? 12 : 14,
+                                                    color: '#fff',
+                                                    lineHeight: 1.4
+                                                }} {...props} />
+                                            </pre>
+                                        ),
+                                        blockquote: ({node, ...props}) => <blockquote style={{
+                                            borderLeft: '4px solid #1ee87a',
+                                            paddingLeft: 16,
+                                            margin: '12px 0',
+                                            fontStyle: 'italic',
+                                            color: '#b6b6b6',
+                                            background: '#2a2f3a',
+                                            padding: '8px 16px',
+                                            borderRadius: '0 8px 8px 0'
+                                        }} {...props} />,
+                                        table: ({node, ...props}) => <div style={{
+                                            overflow: 'auto',
+                                            margin: '12px 0'
+                                        }}>
+                                            <table style={{
+                                                borderCollapse: 'collapse',
+                                                width: '100%',
+                                                background: '#232526',
+                                                borderRadius: 8,
+                                                overflow: 'hidden'
+                                            }} {...props} />
+                                        </div>,
+                                        th: ({node, ...props}) => <th style={{
+                                            background: '#343541',
+                                            padding: '8px 12px',
+                                            textAlign: 'left',
+                                            borderBottom: '1px solid #444654',
+                                            fontWeight: 600,
+                                            color: '#fff'
+                                        }} {...props} />,
+                                        td: ({node, ...props}) => <td style={{
+                                            padding: '8px 12px',
+                                            borderBottom: '1px solid #444654',
+                                            color: '#fff'
+                                        }} {...props} />,
+                                                                            }}
+                                    />
+                                    </div>
+                                <span 
+                                    style={{
+                                        display: 'inline-block',
+                                        width: '2px',
+                                        height: '1.2em',
+                                        background: '#1ee87a',
+                                        marginLeft: '2px',
+                                        animation: 'blink 1s infinite',
+                                        verticalAlign: 'middle'
+                                    }}
+                                />
                             </span>
                         </div>
                     )}
+                    
                     <div ref={chatEndRef} />
                 </div>
                 <form onSubmit={handleSend} style={{
@@ -439,7 +603,7 @@ function Chat({ userId, selectedChat, onNewChat }) {
                         value={mensaje}
                         onChange={e => setMensaje(e.target.value)}
                         placeholder={userRole === 'premium' ? "Preguntá lo que quieras..." : "Actualiza a Premium para chatear"}
-                        disabled={userRole !== 'premium' || loading}
+                        disabled={userRole !== 'premium' || loading || isTyping}
                         onFocus={() => setInputFocus(true)}
                         onBlur={() => setInputFocus(false)}
                         style={{
@@ -458,35 +622,43 @@ function Chat({ userId, selectedChat, onNewChat }) {
                     />
                     <button
                         type="submit"
-                        disabled={userRole !== 'premium' || loading}
+                        disabled={userRole !== 'premium' || loading || isTyping}
                         style={{
                             padding: windowWidth <= 1366 ? '0 24px' : '0 32px',
                             borderRadius: 12,
                             border: 'none',
-                            background: userRole !== 'premium' ? '#666' : (loading ? '#5c5f70' : '#444654'),
+                            background: userRole !== 'premium' ? '#666' : (loading || isTyping ? '#5c5f70' : '#444654'),
                             color: '#fff',
                             fontWeight: 'bold',
                             fontSize: windowWidth <= 1366 ? 16 : 18,
-                            cursor: userRole !== 'premium' || loading ? 'not-allowed' : 'pointer',
+                            cursor: userRole !== 'premium' || loading || isTyping ? 'not-allowed' : 'pointer',
                             boxShadow: '0 2px 8px #0002',
                             transition: 'background 0.2s, color 0.2s',
                         }}
                         onMouseOver={e => {
-                            if (userRole === 'premium' && !loading) {
+                            if (userRole === 'premium' && !loading && !isTyping) {
                                 e.currentTarget.style.background = '#5c5f70';
                             }
                         }}
                         onMouseOut={e => {
-                            if (userRole === 'premium' && !loading) {
+                            if (userRole === 'premium' && !loading && !isTyping) {
                                 e.currentTarget.style.background = '#444654';
                             }
                         }}
                     >
-                        {loading ? 'Enviando...' : (userRole === 'premium' ? 'Enviar' : 'Premium')}
+                        {loading ? 'Enviando...' : isTyping ? 'Escribiendo...' : (userRole === 'premium' ? 'Enviar' : 'Premium')}
                     </button>
                 </form>
                 {error && <p style={{ color: 'red', textAlign: 'center', marginTop: 8 }}>{error}</p>}
             </div>
+            
+            {/* CSS para la animación del cursor */}
+            <style>{`
+                @keyframes blink {
+                    0%, 50% { opacity: 1; }
+                    51%, 100% { opacity: 0; }
+                }
+            `}</style>
         </div>
     );
 }

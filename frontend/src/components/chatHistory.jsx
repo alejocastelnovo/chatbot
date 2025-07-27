@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { auth } from '../firebase';
 import { FiSearch, FiEdit3, FiBook, FiUser, FiSettings } from 'react-icons/fi';
 
-function ChatHistory({ userId, userEmail, onSelectChat, selectedChat, refresh, showProfile, setShowProfile }) {
+function ChatHistory({ userId, userEmail, onSelectChat, selectedChat, refresh, showProfile, setShowProfile, onChatCreated }) {
     const [chats, setChats] = useState([]);
     const [error, setError] = useState('');
     const [editingId, setEditingId] = useState(null);
@@ -10,42 +10,49 @@ function ChatHistory({ userId, userEmail, onSelectChat, selectedChat, refresh, s
     const [search, setSearch] = useState('');
     const [loading, setLoading] = useState(false);
 
-    useEffect(() => {
-        const fetchHistory = async () => {
-            setError('');
-            setLoading(true);
-            try {
-                const idToken = await auth.currentUser?.getIdToken();
-                if (!idToken) {
-                    setError('Error de autenticación');
-                    return;
-                }
-
-                const res = await fetch('http://127.0.0.1:5000/history', {
-                    method: 'GET',
-                    headers: { 
-                        'Authorization': `Bearer ${idToken}`,
-                        'Content-Type': 'application/json'
-                    }
-                });
-                const data = await res.json();
-                if (res.ok) {
-                    setChats(data.chats);
-                } else {
-                    setError(data.error || 'Error al obtener historial');
-                }
-            } catch (err) {
-                setError('No se pudo conectar con el backend');
-            } finally {
-                setLoading(false);
+    const fetchHistory = async () => {
+        setError('');
+        setLoading(true);
+        try {
+            const idToken = await auth.currentUser?.getIdToken();
+            if (!idToken) {
+                setError('Error de autenticación');
+                return;
             }
-        };
-        
+
+            const res = await fetch('http://127.0.0.1:5000/history', {
+                method: 'GET',
+                headers: { 
+                    'Authorization': `Bearer ${idToken}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            const data = await res.json();
+            if (res.ok) {
+                setChats(data.chats);
+            } else {
+                setError(data.error || 'Error al obtener historial');
+            }
+        } catch (err) {
+            setError('No se pudo conectar con el backend');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
         if (auth.currentUser) {
             fetchHistory();
         }
         // eslint-disable-next-line
     }, [userId, refresh]);
+
+    // Refrescar historial cuando cambie el selectedChat
+    useEffect(() => {
+        if (auth.currentUser && selectedChat) {
+            fetchHistory();
+        }
+    }, [selectedChat]);
 
     // Estilo para la lista de chats
     const chatItemStyle = (isSelected) => ({
@@ -65,6 +72,7 @@ function ChatHistory({ userId, userEmail, onSelectChat, selectedChat, refresh, s
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
+        userSelect: 'none', // Para evitar selección de texto
     });
 
     // Acciones de la parte superior
@@ -163,7 +171,39 @@ function ChatHistory({ userId, userEmail, onSelectChat, selectedChat, refresh, s
             <div style={{ padding: 20, paddingBottom: 10, borderBottom: '1px solid #343541' }}>
                 <button
                     style={{ ...actionBtnStyle, color: '#1ee87a' }}
-                    onClick={() => onSelectChat(null)}
+                    onClick={async () => {
+                        try {
+                            const idToken = await auth.currentUser?.getIdToken();
+                            if (!idToken) {
+                                alert('Error de autenticación');
+                                return;
+                            }
+
+                            const res = await fetch('http://127.0.0.1:5000/create-chat', {
+                                method: 'POST',
+                                headers: { 
+                                    'Authorization': `Bearer ${idToken}`,
+                                    'Content-Type': 'application/json'
+                                }
+                            });
+                            
+                            const data = await res.json();
+                            if (res.ok) {
+                                // Crear un objeto de chat vacío
+                                const newChat = {
+                                    chat_id: data.chat_id,
+                                    mensajes: []
+                                };
+                                onSelectChat(newChat);
+                                // Refrescar el historial para incluir el nuevo chat
+                                onChatCreated && onChatCreated();
+                            } else {
+                                alert(data.error || 'Error al crear nuevo chat');
+                            }
+                        } catch (err) {
+                            alert('Error al crear nuevo chat');
+                        }
+                    }}
                     onMouseEnter={e => { e.target.style.background = '#232f4b'; }}
                     onMouseLeave={e => { e.target.style.background = 'transparent'; }}
                 >
@@ -190,6 +230,15 @@ function ChatHistory({ userId, userEmail, onSelectChat, selectedChat, refresh, s
                         }}
                     />
                 </div>
+                <div style={{ height: 4 }} />
+                <button
+                    style={{ ...actionBtnStyle, color: '#3b82f6', fontSize: 13 }}
+                    onClick={fetchHistory}
+                    onMouseEnter={e => { e.target.style.background = '#232f4b'; }}
+                    onMouseLeave={e => { e.target.style.background = 'transparent'; }}
+                >
+                    🔄 Actualizar historial
+                </button>
                 {chats.length > 0 && (
                     <button
                         style={{ ...actionBtnStyle, color: '#ff6b6b', fontSize: 13 }}
@@ -217,16 +266,24 @@ function ChatHistory({ userId, userEmail, onSelectChat, selectedChat, refresh, s
                     }).map(chat => {
                         const firstUserMsg = chat.mensajes.find(m => m.sender === 'user');
                         const isSelected = selectedChat && selectedChat.chat_id === chat.chat_id;
+                        const isEmpty = chat.mensajes.length === 0;
                         return (
                             <li key={chat.chat_id}>
-                                <button
+                                <div
                                     onClick={() => onSelectChat(chat)}
                                     style={chatItemStyle(isSelected)}
                                     onMouseOver={e => { if (!isSelected) e.target.style.background = '#232f4b'; }}
                                     onMouseOut={e => { if (!isSelected) e.target.style.background = 'transparent'; }}
                                 >
-                                    <span style={{ fontWeight: 500 }}>
-                                        {firstUserMsg ? firstUserMsg.text.slice(0, 40) + (firstUserMsg.text.length > 32 ? '...' : '') : 'Chat nuevo'}
+                                    <span style={{ 
+                                        fontWeight: 500,
+                                        color: isEmpty ? '#888' : '#fff',
+                                        fontStyle: isEmpty ? 'italic' : 'normal'
+                                    }}>
+                                        {firstUserMsg ? 
+                                            firstUserMsg.text.slice(0, 40) + (firstUserMsg.text.length > 40 ? '...' : '') : 
+                                            'Chat nuevo'
+                                        }
                                     </span>
                                     <button
                                         onClick={e => {
@@ -247,7 +304,7 @@ function ChatHistory({ userId, userEmail, onSelectChat, selectedChat, refresh, s
                                     >
                                         ×
                                     </button>
-                                </button>
+                                </div>
                             </li>
                         );
                     })}
