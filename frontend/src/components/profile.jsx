@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { auth } from '../firebase';
+import { API_ENDPOINTS, getAuthHeaders, apiRequest } from '../config/api';
 
 function Profile({ onClose }) {
     const [userData, setUserData] = useState({
@@ -41,32 +42,22 @@ function Profile({ onClose }) {
     const loadUserData = async () => {
         try {
             const token = await auth.currentUser.getIdToken();
-            const response = await fetch('/api/user/profile', {
-                method: 'GET',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                }
+            const data = await apiRequest(API_ENDPOINTS.userProfile, {
+                headers: getAuthHeaders(token)
             });
-
-            if (response.ok) {
-                const data = await response.json();
-                setUserData({
-                    nombre: data.nombre || '',
-                    apellido: data.apellido || '',
-                    pais: data.pais || '',
-                    email: data.email || auth.currentUser.email || '',
-                    rol: data.rol || 'free'
-                });
-                setOriginalData({
-                    nombre: data.nombre || '',
-                    apellido: data.apellido || '',
-                    pais: data.pais || ''
-                });
-            } else {
-                const errorData = await response.json();
-                setError(errorData.error || 'Error al cargar los datos del usuario');
-            }
+            
+            setUserData({
+                nombre: data.nombre || '',
+                apellido: data.apellido || '',
+                pais: data.pais || '',
+                email: data.email || auth.currentUser.email || '',
+                rol: data.rol || 'free'
+            });
+            setOriginalData({
+                nombre: data.nombre || '',
+                apellido: data.apellido || '',
+                pais: data.pais || ''
+            });
         } catch (err) {
             console.error('Error cargando datos del usuario:', err);
             setError('Error de conexión al cargar los datos del usuario');
@@ -113,29 +104,20 @@ function Profile({ onClose }) {
 
         try {
             const token = await auth.currentUser.getIdToken();
-            const response = await fetch('/api/user/profile', {
+            const data = await apiRequest(API_ENDPOINTS.userProfile, {
                 method: 'PUT',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
+                headers: getAuthHeaders(token),
                 body: JSON.stringify({
                     nombre: userData.nombre.trim(),
                     apellido: userData.apellido.trim(),
                     pais: userData.pais.trim()
                 })
             });
-
-            const data = await response.json();
-
-            if (response.ok) {
-                setSuccess(data.message || 'Perfil actualizado correctamente');
-                // Limpiar errores de validación
-                setValidationErrors({});
-                setOriginalData(userData); // Actualizar datos originales
-            } else {
-                setError(data.error || 'Error al actualizar el perfil');
-            }
+            
+            setSuccess(data.message || 'Perfil actualizado correctamente');
+            // Limpiar errores de validación
+            setValidationErrors({});
+            setOriginalData(userData); // Actualizar datos originales
         } catch (err) {
             console.error('Error actualizando perfil:', err);
             setError('Error de conexión al actualizar el perfil');
@@ -208,35 +190,26 @@ function Profile({ onClose }) {
 
         try {
             const token = await auth.currentUser.getIdToken();
-            const response = await fetch('/api/user/profile', {
+            const data = await apiRequest(API_ENDPOINTS.userProfile, {
                 method: 'PUT',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
+                headers: getAuthHeaders(token),
                 body: JSON.stringify({
                     nombre: userData.nombre.trim(),
                     apellido: userData.apellido.trim(),
                     pais: userData.pais.trim()
                 })
             });
-
-            const data = await response.json();
-
-            if (response.ok) {
-                setSuccess(data.message || 'Campo actualizado correctamente');
-                setEditingFields(prev => ({
-                    ...prev,
-                    [field]: false
-                }));
-                setOriginalData(prev => ({
-                    ...prev,
-                    [field]: userData[field].trim()
-                }));
-                setValidationErrors({});
-            } else {
-                setError(data.error || 'Error al actualizar el campo');
-            }
+            
+            setSuccess(data.message || 'Campo actualizado correctamente');
+            setEditingFields(prev => ({
+                ...prev,
+                [field]: false
+            }));
+            setOriginalData(prev => ({
+                ...prev,
+                [field]: userData[field].trim()
+            }));
+            setValidationErrors({});
         } catch (err) {
             console.error('Error actualizando campo:', err);
             setError('Error de conexión al actualizar el campo');
@@ -420,35 +393,26 @@ function Profile({ onClose }) {
 
         try {
             const token = await auth.currentUser.getIdToken();
-            const response = await fetch('/api/user/change-password', {
+            const data = await apiRequest(API_ENDPOINTS.changePassword, {
                 method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
+                headers: getAuthHeaders(token),
                 body: JSON.stringify({
                     currentPassword: passwordData.currentPassword,
                     newPassword: passwordData.newPassword
                 })
             });
-
-            const data = await response.json();
-
-            if (response.ok) {
-                setPasswordSuccess(data.message || 'Contraseña actualizada correctamente');
-                setPasswordData({
-                    currentPassword: '',
-                    newPassword: '',
-                    confirmPassword: ''
-                });
-                // Cerrar modal después de 2 segundos
-                setTimeout(() => {
-                    setShowPasswordModal(false);
-                    setPasswordSuccess('');
-                }, 2000);
-            } else {
-                setPasswordError(data.error || 'Error al cambiar la contraseña');
-            }
+            
+            setPasswordSuccess(data.message || 'Contraseña actualizada correctamente');
+            setPasswordData({
+                currentPassword: '',
+                newPassword: '',
+                confirmPassword: ''
+            });
+            // Cerrar modal después de 2 segundos
+            setTimeout(() => {
+                setShowPasswordModal(false);
+                setPasswordSuccess('');
+            }, 2000);
         } catch (err) {
             console.error('Error cambiando contraseña:', err);
             setPasswordError('Error de conexión al cambiar la contraseña');

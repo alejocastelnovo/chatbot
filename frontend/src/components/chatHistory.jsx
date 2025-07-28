@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { auth } from '../firebase';
+import { API_ENDPOINTS, getAuthHeaders, apiRequest } from '../config/api';
 import { FiSearch, FiEdit3, FiBook, FiUser, FiSettings } from 'react-icons/fi';
 
 function ChatHistory({ userId, userEmail, onSelectChat, selectedChat, refresh, showProfile, setShowProfile, onChatCreated }) {
@@ -20,19 +21,10 @@ function ChatHistory({ userId, userEmail, onSelectChat, selectedChat, refresh, s
                 return;
             }
 
-            const res = await fetch('http://127.0.0.1:5000/history', {
-                method: 'GET',
-                headers: { 
-                    'Authorization': `Bearer ${idToken}`,
-                    'Content-Type': 'application/json'
-                }
-            });
-            const data = await res.json();
-            if (res.ok) {
-                setChats(data.chats);
-            } else {
-                setError(data.error || 'Error al obtener historial');
-            }
+                            const data = await apiRequest(API_ENDPOINTS.history, {
+            headers: getAuthHeaders(idToken)
+        });
+            setChats(data.chats);
         } catch (err) {
             setError('No se pudo conectar con el backend');
         } finally {
@@ -109,23 +101,16 @@ function ChatHistory({ userId, userEmail, onSelectChat, selectedChat, refresh, s
                 return;
             }
 
-            const res = await fetch('http://127.0.0.1:5000/delete_chat', {
+            await apiRequest(API_ENDPOINTS.deleteChat, {
                 method: 'POST',
-                headers: { 
-                    'Authorization': `Bearer ${idToken}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ chat_id }),
+                headers: getAuthHeaders(idToken),
+                body: JSON.stringify({ chat_id })
             });
-            const data = await res.json();
-            if (res.ok) {
                 setChats(chats => chats.filter(c => c.chat_id !== chat_id));
                 if (selectedChat && selectedChat.chat_id === chat_id) {
                     onSelectChat(null);
                 }
-            } else {
-                alert(data.error || 'No se pudo eliminar el chat');
-            }
+
         } catch (err) {
             alert('Error al eliminar el chat');
         }
@@ -141,20 +126,12 @@ function ChatHistory({ userId, userEmail, onSelectChat, selectedChat, refresh, s
                 return;
             }
 
-            const res = await fetch('http://127.0.0.1:5000/delete_history', {
+            await apiRequest(API_ENDPOINTS.deleteHistory, {
                 method: 'POST',
-                headers: { 
-                    'Authorization': `Bearer ${idToken}`,
-                    'Content-Type': 'application/json'
-                }
+                headers: getAuthHeaders(idToken)
             });
-            const data = await res.json();
-            if (res.ok) {
-                setChats([]);
-                onSelectChat(null);
-            } else {
-                alert(data.error || 'No se pudo eliminar el historial');
-            }
+            setChats([]);
+            onSelectChat(null);
         } catch (err) {
             alert('Error al eliminar el historial');
         }
@@ -185,27 +162,19 @@ function ChatHistory({ userId, userEmail, onSelectChat, selectedChat, refresh, s
                                 return;
                             }
 
-                            const res = await fetch('http://127.0.0.1:5000/create-chat', {
+                            const data = await apiRequest(API_ENDPOINTS.createChat, {
                                 method: 'POST',
-                                headers: { 
-                                    'Authorization': `Bearer ${idToken}`,
-                                    'Content-Type': 'application/json'
-                                }
+                                headers: getAuthHeaders(idToken)
                             });
                             
-                            const data = await res.json();
-                            if (res.ok) {
-                                // Crear un objeto de chat vacío
-                                const newChat = {
-                                    chat_id: data.chat_id,
-                                    mensajes: []
-                                };
-                                onSelectChat(newChat);
-                                // Refrescar el historial para incluir el nuevo chat
-                                onChatCreated && onChatCreated();
-                            } else {
-                                alert(data.error || 'Error al crear nuevo chat');
-                            }
+                            // Crear un objeto de chat vacío
+                            const newChat = {
+                                chat_id: data.chat_id,
+                                mensajes: []
+                            };
+                            onSelectChat(newChat);
+                            // Refrescar el historial para incluir el nuevo chat
+                            onChatCreated && onChatCreated();
                         } catch (err) {
                             alert('Error al crear nuevo chat');
                         }

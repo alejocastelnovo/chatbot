@@ -52,6 +52,30 @@ def require_auth(f):
 def home():
     return "API funcionando con Firebase", 200
 
+@app.route('/health', methods=['GET'])
+def health_check():
+    """Health check para monitoreo"""
+    try:
+        # Verificar conexión a Firebase
+        db.collection('health').document('test').get()
+        
+        # Verificar conexión a OpenAI
+        client.models.list()
+        
+        return jsonify({
+            'status': 'healthy',
+            'timestamp': datetime.now().isoformat(),
+            'services': {
+                'firebase': 'connected',
+                'openai': 'connected'
+            }
+        }), 200
+    except Exception as e:
+        return jsonify({
+            'status': 'unhealthy',
+            'error': str(e)
+        }), 503
+
 @app.route('/create-chat', methods=['POST'])
 @require_auth
 def create_chat():

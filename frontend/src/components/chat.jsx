@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { auth } from '../firebase';
 import optradingblanco from '../assets/optradingblanco.png';
 import ReactMarkdown from 'react-markdown';
+import { API_ENDPOINTS, getAuthHeaders, apiRequest } from '../config/api';
 
 function Chat({ userId, selectedChat, onNewChat, onChatCreated }) {
     const [mensaje, setMensaje] = useState('');
@@ -72,17 +73,10 @@ function Chat({ userId, selectedChat, onNewChat, onChatCreated }) {
         try {
             const idToken = await auth.currentUser?.getIdToken(true);
             if (idToken) {
-                const res = await fetch('http://127.0.0.1:5000/user/role', {
-                    method: 'GET',
-                    headers: { 
-                        'Authorization': `Bearer ${idToken}`,
-                        'Content-Type': 'application/json'
-                    }
+                const data = await apiRequest(API_ENDPOINTS.userRole, {
+                    headers: getAuthHeaders(idToken)
                 });
-                if (res.ok) {
-                    const data = await res.json();
-                    setUserRole(data.role);
-                }
+                setUserRole(data.role);
             }
         } catch (err) {
             console.error('Error obteniendo rol:', err);
@@ -183,34 +177,25 @@ function Chat({ userId, selectedChat, onNewChat, onChatCreated }) {
                 return;
             }
 
-            const res = await fetch('http://127.0.0.1:5000/chat', {
+            const data = await apiRequest(API_ENDPOINTS.chat, {
                 method: 'POST',
-                headers: { 
-                    'Authorization': `Bearer ${idToken}`,
-                    'Content-Type': 'application/json'
-                },
+                headers: getAuthHeaders(idToken),
                 body: JSON.stringify({
                     chat_id: chatId,
                     message: userMessage
-                }),
+                })
             });
             
-            const data = await res.json();
-            
-            if (res.ok) {
-                // Si es un nuevo chat (no tenía chatId), actualizar el historial
-                if (!chatId && data.chat_id) {
-                    setChatId(data.chat_id);
-                    // Notificar al componente padre para refrescar el historial
-                    onNewChat && onNewChat();
-                    onChatCreated && onChatCreated();
-                }
-                
-                // Iniciar efecto de escritura
-                simulateTyping(data.reply);
-            } else {
-                setError(data.error || 'Error al enviar mensaje');
+            // Si es un nuevo chat (no tenía chatId), actualizar el historial
+            if (!chatId && data.chat_id) {
+                setChatId(data.chat_id);
+                // Notificar al componente padre para refrescar el historial
+                onNewChat && onNewChat();
+                onChatCreated && onChatCreated();
             }
+            
+            // Iniciar efecto de escritura
+            simulateTyping(data.reply);
         } catch (err) {
             setError('No se pudo conectar con el backend');
         } finally {
@@ -344,7 +329,8 @@ function Chat({ userId, selectedChat, onNewChat, onChatCreated }) {
                                 borderRadius: 12,
                                 fontSize: '0.8rem',
                                 fontWeight: 'bold',
-                                textTransform: 'uppercase'
+                                textTransform: 'uppercase',
+                                marginBottom: 16,
                             }}>
                                 Plan: {userRole === 'premium' ? 'Premium' : 'Free'}
                             </div>
