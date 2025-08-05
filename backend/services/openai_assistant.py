@@ -237,18 +237,21 @@ Puedes usar las siguientes funciones para obtener información en tiempo real:
         """Envía un mensaje al thread y obtiene la respuesta"""
         try:
             # Crear el mensaje
-            message_data = {
-                "role": "user",
-                "content": message
-            }
-            
             if file_ids:
-                message_data["file_ids"] = file_ids
-            
-            self.client.beta.threads.messages.create(
-                thread_id=thread_id,
-                **message_data
-            )
+                # Si hay archivos, crear el mensaje con attachments
+                self.client.beta.threads.messages.create(
+                    thread_id=thread_id,
+                    role="user",
+                    content=message,
+                    attachments=[{"file_id": file_id, "tools": [{"type": "file_search"}]} for file_id in file_ids]
+                )
+            else:
+                # Mensaje sin archivos
+                self.client.beta.threads.messages.create(
+                    thread_id=thread_id,
+                    role="user",
+                    content=message
+                )
             
             # Ejecutar el run
             run = self.client.beta.threads.runs.create(
@@ -368,10 +371,20 @@ Puedes usar las siguientes funciones para obtener información en tiempo real:
             
             formatted_messages = []
             for msg in messages.data:
+                # Extraer el contenido del mensaje de manera segura
+                content = ""
+                if msg.content and len(msg.content) > 0:
+                    if hasattr(msg.content[0], 'text') and hasattr(msg.content[0].text, 'value'):
+                        content = msg.content[0].text.value
+                    elif hasattr(msg.content[0], 'text'):
+                        content = msg.content[0].text
+                    else:
+                        content = str(msg.content[0])
+                
                 formatted_messages.append({
                     "id": msg.id,
                     "role": msg.role,
-                    "content": msg.content[0].text.value if msg.content else "",
+                    "content": content,
                     "created_at": msg.created_at
                 })
             

@@ -21,10 +21,26 @@ function ChatHistory({ userId, userEmail, onSelectChat, selectedChat, refresh, s
                 return;
             }
 
-                            const data = await apiRequest(API_ENDPOINTS.history, {
-            headers: getAuthHeaders(idToken)
-        });
-            setChats(data.chats);
+            // Usar el nuevo endpoint del assistant
+            const data = await apiRequest(API_ENDPOINTS.assistantHistory, {
+                headers: getAuthHeaders(idToken)
+            });
+            
+            if (data.success && data.messages) {
+                // Convertir mensajes del assistant a formato de chats
+                const assistantChats = [{
+                    chat_id: data.thread_id || 'assistant',
+                    created_at: new Date().toISOString(),
+                    mensajes: data.messages.map(msg => ({
+                        sender: msg.role === 'assistant' ? 'bot' : 'user',
+                        text: msg.content
+                    })),
+                    message_count: data.messages.length
+                }];
+                setChats(assistantChats);
+            } else {
+                setChats([]);
+            }
         } catch (err) {
             setError('No se pudo conectar con el backend');
         } finally {
@@ -101,15 +117,16 @@ function ChatHistory({ userId, userEmail, onSelectChat, selectedChat, refresh, s
                 return;
             }
 
-            await apiRequest(API_ENDPOINTS.deleteChat, {
+            // Usar el nuevo endpoint del assistant para limpiar historial
+            await apiRequest(API_ENDPOINTS.assistantClear, {
                 method: 'POST',
-                headers: getAuthHeaders(idToken),
-                body: JSON.stringify({ chat_id })
+                headers: getAuthHeaders(idToken)
             });
-                setChats(chats => chats.filter(c => c.chat_id !== chat_id));
-                if (selectedChat && selectedChat.chat_id === chat_id) {
-                    onSelectChat(null);
-                }
+            
+            setChats([]);
+            if (selectedChat && selectedChat.chat_id === chat_id) {
+                onSelectChat(null);
+            }
 
         } catch (err) {
             alert('Error al eliminar el chat');
@@ -126,7 +143,8 @@ function ChatHistory({ userId, userEmail, onSelectChat, selectedChat, refresh, s
                 return;
             }
 
-            await apiRequest(API_ENDPOINTS.deleteHistory, {
+            // Usar el nuevo endpoint del assistant para limpiar historial
+            await apiRequest(API_ENDPOINTS.assistantClear, {
                 method: 'POST',
                 headers: getAuthHeaders(idToken)
             });
@@ -162,18 +180,20 @@ function ChatHistory({ userId, userEmail, onSelectChat, selectedChat, refresh, s
                                 return;
                             }
 
-                            const data = await apiRequest(API_ENDPOINTS.createChat, {
+                            // Para el nuevo sistema, simplemente limpiar el historial
+                            // y crear un nuevo thread automáticamente
+                            await apiRequest(API_ENDPOINTS.assistantClear, {
                                 method: 'POST',
                                 headers: getAuthHeaders(idToken)
                             });
                             
-                            // Crear un objeto de chat vacío
+                            // Crear un objeto de chat vacío para el assistant
                             const newChat = {
-                                chat_id: data.chat_id,
+                                chat_id: 'assistant',
                                 mensajes: []
                             };
                             onSelectChat(newChat);
-                            // Refrescar el historial para incluir el nuevo chat
+                            // Refrescar el historial
                             onChatCreated && onChatCreated();
                         } catch (err) {
                             alert('Error al crear nuevo chat');

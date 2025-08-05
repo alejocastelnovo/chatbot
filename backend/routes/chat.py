@@ -92,8 +92,9 @@ def assistant_chat():
             return jsonify({'error': 'Datos requeridos'}), 400
         
         message = data.get('message', '').strip()
-        if not message:
-            return jsonify({'error': 'Mensaje requerido'}), 400
+        # Permitir mensajes vacíos si hay archivos adjuntos
+        if not message and not data.get('files'):
+            return jsonify({'error': 'Mensaje requerido o archivos adjuntos'}), 400
         
         # Obtener o crear thread_id para el usuario
         thread_id = get_user_thread_id(user_id)
@@ -103,7 +104,7 @@ def assistant_chat():
         if 'files' in data and data['files']:
             for file_data in data['files']:
                 if file_data.get('type') == 'image' and file_data.get('url'):
-                    # Para URLs de imágenes, las procesamos directamente
+                    # El url contiene el file_id que devolvió el endpoint de upload
                     file_ids.append(file_data['url'])
         
         # Enviar mensaje al assistant
@@ -191,10 +192,20 @@ def upload_file():
                 'size': file_size
             })
             
+        except Exception as upload_error:
+            logger.error(f"Error subiendo archivo a OpenAI: {upload_error}")
+            return jsonify({
+                'success': False,
+                'error': f'Error subiendo archivo a OpenAI: {str(upload_error)}'
+            }), 500
+            
         finally:
             # Limpiar archivo temporal
             if os.path.exists(temp_path):
-                os.unlink(temp_path)
+                try:
+                    os.unlink(temp_path)
+                except Exception as cleanup_error:
+                    logger.warning(f"Error limpiando archivo temporal: {cleanup_error}")
                 
     except Exception as e:
         logger.error(f"Error subiendo archivo: {e}")

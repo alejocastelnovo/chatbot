@@ -154,11 +154,20 @@ function AssistantChat({ userId, selectedChat, onNewChat, onChatCreated }) {
                 
                 if (response.ok) {
                     const data = await response.json();
-                    uploadedFiles.push({
-                        type: 'image',
-                        url: data.file_id,
-                        filename: file.name
-                    });
+                    if (data.success && data.file_id) {
+                        uploadedFiles.push({
+                            type: 'image',
+                            url: data.file_id,
+                            filename: file.name
+                        });
+                    } else {
+                        console.error('Error en respuesta de upload:', data);
+                        setError(`Error subiendo ${file.name}: ${data.error || 'Error desconocido'}`);
+                    }
+                } else {
+                    const errorData = await response.json().catch(() => ({}));
+                    console.error('Error HTTP en upload:', response.status, errorData);
+                    setError(`Error subiendo ${file.name}: ${errorData.error || 'Error de servidor'}`);
                 }
             }
         } catch (err) {
