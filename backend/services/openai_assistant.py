@@ -348,11 +348,8 @@ Puedes usar las siguientes funciones para obtener información en tiempo real:
                     purpose="assistants"
                 )
             
-            # Asociar el archivo con el assistant
-            self.client.beta.assistants.files.create(
-                assistant_id=self.assistant_id,
-                file_id=uploaded_file.id
-            )
+            # En la nueva API, los archivos se asocian automáticamente con el assistant
+            # cuando se usan en un mensaje, no necesitamos asociarlos manualmente
             
             logger.info(f"Archivo subido: {uploaded_file.id}")
             return uploaded_file.id
