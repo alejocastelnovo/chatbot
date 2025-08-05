@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './firebase';
 import Login from './components/login';
-import Chat from './components/chat';
+import AssistantChat from './components/AssistantChat';
 import ChatHistory from './components/chatHistory';
 import Navbar from './components/navbar';
 import Profile from './components/profile';
@@ -94,7 +94,7 @@ function App() {
         </aside>
         <main className="chatbox" style={{ display: 'flex', flexDirection: 'column', flex: 1, height: '100%' }}>
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-            <Chat 
+            <AssistantChat 
               userId={user.user_id} 
               selectedChat={selectedChat} 
               onNewChat={handleNewChat} 

@@ -149,39 +149,52 @@ def chat():
         }
         chat_ref.collection('messages').add(message_data)
 
-                # Importar funciones especializadas de chat
-        from services.chat import get_trading_analysis, get_quick_analysis
+                        # Usar el nuevo sistema de Assistants API
+        from services.openai_assistant import assistant_manager
         
-        # Obtener historial de conversación para contexto
-        conversation_history = []
-        if chat_id:
-            # Obtener mensajes previos del chat actual
-            messages_ref = chat_ref.collection('messages').order_by('timestamp', direction=firestore.Query.ASCENDING)
-            messages_docs = messages_ref.stream()
-            
-            for msg_doc in messages_docs:
-                msg_data = msg_doc.to_dict()
-                role = "assistant" if msg_data['sender'] == 'bot' else "user"
-                conversation_history.append({
-                    "role": role,
-                    "content": msg_data['text']
+        # Obtener o crear thread_id para el usuario
+        def get_user_thread_id(user_id):
+            try:
+                # Buscar en Firestore si el usuario ya tiene un thread_id
+                user_doc = db.collection('users').document(user_id).get()
+                
+                if user_doc.exists:
+                    user_data = user_doc.to_dict()
+                    thread_id = user_data.get('thread_id')
+                    
+                    if thread_id:
+                        # Verificar que el thread aún existe en OpenAI
+                        try:
+                            assistant_manager.client.beta.threads.retrieve(thread_id)
+                            return thread_id
+                        except Exception as e:
+                            print(f"Thread {thread_id} no existe, creando uno nuevo")
+                
+                # Crear nuevo thread
+                thread_id = assistant_manager.get_or_create_thread(user_id)
+                
+                # Guardar thread_id en Firestore
+                db.collection('users').document(user_id).update({
+                    'thread_id': thread_id,
+                    'fechaActualizacion': datetime.now()
                 })
-            
-            # Limitar el historial a los últimos 10 mensajes para no exceder tokens
-            conversation_history = conversation_history[-10:]
+                
+                return thread_id
+                
+            except Exception as e:
+                print(f"Error obteniendo thread_id para usuario {user_id}: {e}")
+                # Fallback: crear thread sin guardar en Firebase
+                return assistant_manager.get_or_create_thread(user_id)
         
-        # Determinar el tipo de análisis basado en el mensaje
-        trading_keywords = ['análisis', 'gráfico', 'tendencia', 'soporte', 'resistencia', 
-                          'rsi', 'macd', 'bollinger', 'crypto', 'bitcoin', 'ethereum',
-                          'acciones', 'trading', 'invertir', 'compra', 'venta', 'patrón',
-                          'indicador', 'volumen', 'momentum', 'fibonacci']
+        thread_id = get_user_thread_id(user_id)
         
-        is_trading_related = any(keyword in user_message.lower() for keyword in trading_keywords)
+        # Enviar mensaje al assistant
+        result = assistant_manager.send_message(thread_id, user_message)
         
-        if is_trading_related:
-            bot_reply = get_trading_analysis(user_message, conversation_history=conversation_history)
+        if result['success']:
+            bot_reply = result['message']
         else:
-            bot_reply = get_quick_analysis(user_message, conversation_history=conversation_history)
+            bot_reply = f"Error procesando mensaje: {result['error']}"
 
         # Guardar respuesta del bot
         bot_message_data = {
@@ -615,6 +628,10 @@ def clean_empty_chats(user_id):
                 
     except Exception as e:
         print(f"Error limpiando chats vacíos: {e}")
+
+# Registrar blueprints
+from routes.chat import init_app as init_chat_routes
+init_chat_routes(app)
 
 if __name__ == '__main__':
     app.run(debug=True)
